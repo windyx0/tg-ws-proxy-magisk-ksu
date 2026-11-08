@@ -9,7 +9,7 @@
 ui_print " "
 ui_print "=============================="
 ui_print "  TgBypass All-In-One"
-ui_print "  Version 1.2.2"
+ui_print "  Version 1.2.3"
 ui_print "  Author: windyx0"
 ui_print "  Magisk / KernelSU / APatch"
 ui_print "=============================="

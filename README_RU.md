@@ -100,14 +100,14 @@ flowchart TD
 ### Вариант 1: Модуль Magisk / KernelSU / APatch (Рекомендуемый)
 
 Модуль включает все компоненты в едином flashable архиве:
-1. Загрузите релизный архив `TgBypass-Module-v1.2.2.zip`.
+1. Загрузите релизный архив `TgBypass-Module-v1.2.3.zip`.
 2. Откройте приложение Magisk, KernelSU или APatch.
 3. Перейдите во вкладку "Модули" -> "Установить из хранилища".
 4. Выберите архив и подтвердите установку.
 5. Перезагрузите устройство.
 
 Модуль автоматически:
-- Установит приложение `TgBypass-v1.2.2.apk`.
+- Установит приложение `TgBypass-v1.2.3.apk`.
 - Активирует модуль в LSPosed / Vector и настроит область видимости.
 - Развернет и включит плагин в AyuGram (при наличии).
 - Применит сетевые оптимизации TCP BBR / TFO.
@@ -115,7 +115,7 @@ flowchart TD
 
 ### Вариант 2: Ручная установка APK + LSPosed
 
-1. Установите `TgBypass-v1.2.2.apk`.
+1. Установите `TgBypass-v1.2.3.apk`.
 2. Откройте менеджер LSPosed (или Vector Framework).
 3. Перейдите в список модулей, включите **TgBypass**.
 4. В области действия (Scope) отметьте установленные клиенты Telegram (кроме AyuGram).
@@ -175,8 +175,8 @@ python scripts/package_release.py
 ```
 
 Скрипт формирует архивы в каталоге `release/`:
-- `TgBypass-Module-v1.2.2.zip`
-- `TgBypass-v1.2.2.apk`
+- `TgBypass-Module-v1.2.3.zip`
+- `TgBypass-v1.2.3.apk`
 - `tg_ws_vector_bridge.py`
 
 ---

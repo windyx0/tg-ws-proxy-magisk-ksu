@@ -100,14 +100,14 @@ flowchart TD
 ### Method 1: Magisk / KernelSU / APatch Module (Recommended)
 
 Installs all components via a single flashable zip:
-1. Download the latest `TgBypass-Module-v1.2.2.zip` from Releases.
+1. Download the latest `TgBypass-Module-v1.2.3.zip` from Releases.
 2. Open your root manager (Magisk, KernelSU, or APatch).
 3. Navigate to Modules -> Install from storage.
 4. Select the archive and confirm installation.
 5. Reboot your device.
 
 The module automatically:
-- Installs the companion manager app `TgBypass-v1.2.2.apk`.
+- Installs the companion manager app `TgBypass-v1.2.3.apk`.
 - Activates the module inside LSPosed / Vector and configures application scopes.
 - Deploys and enables the bridge plugin in AyuGram (if detected).
 - Applies TCP BBR and kernel buffer optimizations.
@@ -115,7 +115,7 @@ The module automatically:
 
 ### Method 2: Standalone APK + LSPosed
 
-1. Install `TgBypass-v1.2.2.apk`.
+1. Install `TgBypass-v1.2.3.apk`.
 2. Open LSPosed (or Vector Framework).
 3. Enable the **TgBypass** module.
 4. In the module Scope settings, check your installed Telegram clients (exclude AyuGram).
@@ -175,8 +175,8 @@ python scripts/package_release.py
 ```
 
 The script generates the following assets in `release/`:
-- `TgBypass-Module-v1.2.2.zip`
-- `TgBypass-v1.2.2.apk`
+- `TgBypass-Module-v1.2.3.zip`
+- `TgBypass-v1.2.3.apk`
 - `tg_ws_vector_bridge.py`
 
 ---

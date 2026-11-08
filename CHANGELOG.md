@@ -4,6 +4,30 @@ All notable changes to TgBypass All-In-One are documented in this file.
 
 ---
 
+## [v1.2.3] - 2026-11-08
+
+### English
+- **Telegram Client Selection**:
+  - Added client chooser dialog when launching Telegram with multiple installed clients.
+  - Added direct launch buttons for each detected Telegram client in the dashboard.
+- **Robust Cloudflare & Backend Ping**:
+  - Resolved transient timeout issues via two-stage TCP connect and pre-resolved DNS.
+  - Automatic retry for network jitter ensuring accurate latency measurements.
+- **Unified Distribution**:
+  - Cleaned release package to include the Magisk/KernelSU flashable module, standalone companion APK, and the standalone AyuGram bridge plugin.
+
+### Русский
+- **Выбор клиента Telegram**:
+  - Добавлен диалог выбора клиента Telegram при наличии нескольких установленных клиентов.
+  - Добавлены кнопки быстрого запуска для каждого обнаруженного клиента прямо в карточке на главном экране.
+- **Стабильный пинг серверов Cloudflare и бэкендов**:
+  - Устранены ложные таймауты серверов благодаря предварительному разрешению DNS и автоматическому повтору попытки при задержках сети.
+  - Точное измерение чистой сетевой задержки (TCP RTT).
+- **Очищенный состав релиза**:
+  - В релизе оставлены только три ключевых компонента: прошиваемый модуль для Magisk/KernelSU, самостоятельный APK приложения и плагин моста для AyuGram.
+
+---
+
 ## [v1.2.2] - 2026-11-08
 
 ### English

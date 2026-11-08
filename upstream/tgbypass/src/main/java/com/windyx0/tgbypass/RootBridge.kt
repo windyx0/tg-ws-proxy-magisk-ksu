@@ -13,6 +13,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
 
@@ -216,10 +217,11 @@ object RootBridge {
         }
     }
 
-    suspend fun isEndpointReachable(host: String, port: Int = 443, timeoutMs: Int = 600): Boolean = withContext(Dispatchers.IO) {
+    suspend fun isEndpointReachable(host: String, port: Int = 443, timeoutMs: Int = 1200): Boolean = withContext(Dispatchers.IO) {
         try {
+            val addr = InetAddress.getByName(host)
             Socket().use { s ->
-                s.connect(InetSocketAddress(host, port), timeoutMs)
+                s.connect(InetSocketAddress(addr, port), timeoutMs)
                 true
             }
         } catch (_: Exception) {
@@ -449,16 +451,24 @@ object RootBridge {
         getZapret2Status().first
     }
 
-    suspend fun pingEndpoint(host: String, port: Int = 443, timeoutMs: Int = 800): Long? = withContext(Dispatchers.IO) {
-        val start = System.currentTimeMillis()
-        try {
-            Socket().use { s ->
-                s.connect(InetSocketAddress(host, port), timeoutMs)
-                System.currentTimeMillis() - start
+    suspend fun pingEndpoint(host: String, port: Int = 443, timeoutMs: Int = 2500): Long? = withContext(Dispatchers.IO) {
+        for (attempt in 1..2) {
+            try {
+                val addr = InetAddress.getByName(host)
+                val socketAddress = InetSocketAddress(addr, port)
+                val start = System.currentTimeMillis()
+                Socket().use { s ->
+                    s.tcpNoDelay = true
+                    s.connect(socketAddress, timeoutMs)
+                    return@withContext (System.currentTimeMillis() - start)
+                }
+            } catch (_: Exception) {
+                if (attempt == 1) {
+                    delay(120)
+                }
             }
-        } catch (_: Exception) {
-            null
         }
+        null
     }
 
     suspend fun testCloudflareEndpoints(): List<LatencyInfo> = coroutineScope {
@@ -472,15 +482,30 @@ object RootBridge {
             LatencyInfo(0, "ZaSto WSS Node (Worker Backup)", "nodeone.brackencombe.workers.dev", 443, null)
         )
 
-        list.map { item ->
+        list.mapIndexed { idx, item ->
             async {
+                delay(idx * 30L)
                 val lat = pingEndpoint(item.host, item.port)
                 item.copy(latencyMs = lat)
             }
         }.awaitAll()
     }
-    suspend fun openTelegram(context: Context) = withContext(Dispatchers.IO) {
+
+    suspend fun openTelegram(context: Context, packageName: String? = null) = withContext(Dispatchers.IO) {
         val pm = context.packageManager
+        if (!packageName.isNullOrEmpty()) {
+            val intent = pm.getLaunchIntentForPackage(packageName)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                try {
+                    context.startActivity(intent)
+                    return@withContext
+                } catch (_: Exception) {}
+            }
+            execRoot("monkey -p $packageName -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 &")
+            return@withContext
+        }
+
         for ((pkg, _) in ALL_TELEGRAM_PACKAGES) {
             val intent = pm.getLaunchIntentForPackage(pkg)
             if (intent != null) {

@@ -18,7 +18,7 @@ ASSETS_DIR = os.path.join(UPSTREAM_DIR, "tgbypass", "src", "main", "assets")
 APK_RELEASE_PATH = os.path.join(UPSTREAM_DIR, "tgbypass", "build", "outputs", "apk", "release", "tgbypass-release.apk")
 APK_DEBUG_PATH = os.path.join(UPSTREAM_DIR, "tgbypass", "build", "outputs", "apk", "debug", "tgbypass-debug.apk")
 
-VERSION = "1.2.2"
+VERSION = "1.2.3"
 
 def ensure_build():
     if os.path.exists(APK_RELEASE_PATH):

@@ -196,6 +196,7 @@ fun TgBypassDashboard() {
     var remoteVersionInfo by remember { mutableStateOf<String?>(null) }
     var isCheckingUpdates by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showClientChooserDialog by remember { mutableStateOf(false) }
     var showTopMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(showUpdatesDialog) {
@@ -210,19 +211,19 @@ fun TgBypassDashboard() {
                     if (conn.responseCode == 200) {
                         val txt = conn.inputStream.bufferedReader().readText()
                         val json = org.json.JSONObject(txt)
-                        val code = json.optInt("versionCode", 122)
-                        val ver = json.optString("version", "v1.2.2")
+                        val code = json.optInt("versionCode", 123)
+                        val ver = json.optString("version", "v1.2.3")
                         withContext(Dispatchers.Main) {
-                            remoteVersionInfo = if (code > 122) "Доступно обновление: $ver" else "У вас актуальная версия ($ver)"
+                            remoteVersionInfo = if (code > 123) "Доступно обновление: $ver" else "У вас актуальная версия ($ver)"
                         }
                     } else {
                         withContext(Dispatchers.Main) {
-                            remoteVersionInfo = "Актуальная версия (v1.2.2)"
+                            remoteVersionInfo = "Актуальная версия (v1.2.3)"
                         }
                     }
                 } catch (_: Exception) {
                     withContext(Dispatchers.Main) {
-                        remoteVersionInfo = "Актуальная версия (v1.2.2)"
+                        remoteVersionInfo = "Актуальная версия (v1.2.3)"
                     }
                 } finally {
                     withContext(Dispatchers.Main) {
@@ -389,7 +390,7 @@ fun TgBypassDashboard() {
                                     color = MaterialTheme.colorScheme.primaryContainer
                                 ) {
                                     Text(
-                                        text = "v1.2.2",
+                                        text = "v1.2.3",
                                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -591,8 +592,8 @@ fun TgBypassDashboard() {
                     Text(
                         text = when {
                             isChecking -> "Проверка компонентов..."
-                            allGood -> "Обход Telegram активен - v1.2.2"
-                            else -> "TgBypass All-In-One - v1.2.2"
+                            allGood -> "Обход Telegram активен - v1.2.3"
+                            else -> "TgBypass All-In-One - v1.2.3"
                         },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
@@ -893,7 +894,16 @@ fun TgBypassDashboard() {
                                 Spacer(modifier = Modifier.height(10.dp))
                             }
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        scope.launch {
+                                            RootBridge.openTelegram(context, client.packageName)
+                                        }
+                                        showInline("Запуск: ${client.name}")
+                                    }
+                                    .padding(vertical = 4.dp, horizontal = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
@@ -937,6 +947,25 @@ fun TgBypassDashboard() {
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                IconButton(
+                                    onClick = {
+                                        scope.launch {
+                                            RootBridge.openTelegram(context, client.packageName)
+                                        }
+                                        showInline("Запуск: ${client.name}")
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Send,
+                                        contentDescription = "Запустить ${client.name}",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -945,10 +974,21 @@ fun TgBypassDashboard() {
 
                     OutlinedButton(
                         onClick = {
-                            scope.launch {
-                                RootBridge.openTelegram(context)
+                            val installed = telegramClients?.filter { it.isInstalled } ?: emptyList()
+                            if (installed.size > 1) {
+                                showClientChooserDialog = true
+                            } else if (installed.size == 1) {
+                                val c = installed.first()
+                                scope.launch {
+                                    RootBridge.openTelegram(context, c.packageName)
+                                }
+                                showInline("Запуск: ${c.name}")
+                            } else {
+                                scope.launch {
+                                    RootBridge.openTelegram(context)
+                                }
+                                showInline("Запуск Telegram")
                             }
-                            showInline("Запуск клиента Telegram")
                         },
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                         shape = RoundedCornerShape(14.dp)
@@ -1191,7 +1231,7 @@ fun TgBypassDashboard() {
             title = { Text(text = "Проверка обновлений", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(text = "Текущая версия: v1.2.2 (All-In-One Unified)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text(text = "Текущая версия: v1.2.3 (All-In-One Unified)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
 
                     if (isCheckingUpdates) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1216,7 +1256,7 @@ fun TgBypassDashboard() {
                     }
 
                     Text(
-                        text = "- Встроенный демон tg-ws-proxy: v1.2.2\n- Встроенный Vector Hook модуль: v2.2\n- Встроенный AyuGram Bridge плагин: v2.2",
+                        text = "- Встроенный демон tg-ws-proxy: v1.2.3\n- Встроенный Vector Hook модуль: v2.2\n- Встроенный AyuGram Bridge плагин: v2.2",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1254,7 +1294,7 @@ fun TgBypassDashboard() {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(text = "TgBypass All-In-One Unified", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(text = "Версия: 1.2.2\nРазработчик: @windyx0", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "Версия: 1.2.3\nРазработчик: @windyx0", style = MaterialTheme.typography.bodyMedium)
                     Text(
                         text = "Включает в себя:\n- Менеджер и GUI с Material Design 3\n- Модуль Vector (LSPosed)\n- Мост-плагин для AyuGram (с автосинхронизацией)\n- ZaSto WSS Cloudflare туннели\n- Интеграцию с Zapret2",
                         style = MaterialTheme.typography.bodySmall,
@@ -1264,6 +1304,111 @@ fun TgBypassDashboard() {
             },
             confirmButton = {
                 TextButton(onClick = { showAboutDialog = false }) { Text("Закрыть") }
+            }
+        )
+    }
+
+    // Telegram Client Chooser Dialog
+    if (showClientChooserDialog) {
+        val installed = telegramClients?.filter { it.isInstalled } ?: emptyList()
+        AlertDialog(
+            onDismissRequest = { showClientChooserDialog = false },
+            icon = {
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Выберите клиент Telegram",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (installed.isEmpty()) {
+                        Text(
+                            text = "Установленные клиенты Telegram не найдены",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        installed.forEach { client ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        showClientChooserDialog = false
+                                        scope.launch {
+                                            RootBridge.openTelegram(context, client.packageName)
+                                        }
+                                        showInline("Запуск: ${client.name}")
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = client.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = MaterialTheme.colorScheme.surface
+                                            ) {
+                                                Text(
+                                                    text = if (client.method == BypassMethod.AYUGRAM_PLUGIN) "PLUGIN" else "VECTOR",
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = client.packageName,
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Send,
+                                        contentDescription = "Запустить",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showClientChooserDialog = false }) {
+                    Text("Отмена")
+                }
             }
         )
     }

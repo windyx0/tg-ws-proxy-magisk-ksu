@@ -3,7 +3,7 @@ English | [Русский](README_RU.md)
 # TgBypass All-In-One (Vector + Service)
 ### Author: windyx0
 ### Module for Magisk / KernelSU / APatch
-### Version: v1.2.2
+### Version: v1.2.3
 ### Companion App: com.windyx0.tgbypass
 
 An all-in-one system module for Telegram censorship bypass and Linux root network acceleration. Features an autonomous background WebSocket tunnel daemon (127.0.0.1:1444), automatic installer for the Vector (LSPosed) module, and an integrated AyuGram bridge plugin.
@@ -43,7 +43,7 @@ An all-in-one system module for Telegram censorship bypass and Linux root networ
 
 ## Installation
 
-1. Download the module archive: `TgBypass-Module-v1.2.2.zip`.
+1. Download the module archive: `TgBypass-Module-v1.2.3.zip`.
 2. Open Magisk, KernelSU, or APatch manager.
 3. Go to the "Modules" section -> "Install from storage".
 4. Select the archive and confirm installation.
