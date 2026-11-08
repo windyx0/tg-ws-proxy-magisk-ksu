@@ -204,8 +204,12 @@ fun TgBypassDashboard() {
             isCheckingUpdates = true
             withContext(Dispatchers.IO) {
                 try {
-                    val url = java.net.URL("https://raw.githubusercontent.com/windyx0/tg-ws-proxy-magisk-ksu/main/update.json")
+                    val url = java.net.URL("https://raw.githubusercontent.com/windyx0/tg-ws-proxy-magisk-ksu/main/update.json?t=" + System.currentTimeMillis())
                     val conn = url.openConnection() as java.net.HttpURLConnection
+                    conn.useCaches = false
+                    conn.defaultUseCaches = false
+                    conn.setRequestProperty("Cache-Control", "no-cache")
+                    conn.setRequestProperty("Pragma", "no-cache")
                     conn.connectTimeout = 3000
                     conn.readTimeout = 3000
                     if (conn.responseCode == 200) {
@@ -214,7 +218,7 @@ fun TgBypassDashboard() {
                         val code = json.optInt("versionCode", 123)
                         val ver = json.optString("version", "v1.2.3")
                         withContext(Dispatchers.Main) {
-                            remoteVersionInfo = if (code > 123) "Доступно обновление: $ver" else "У вас актуальная версия ($ver)"
+                            remoteVersionInfo = if (code > 123) "Доступно обновление: $ver" else "У вас актуальная версия (v1.2.3)"
                         }
                     } else {
                         withContext(Dispatchers.Main) {
@@ -1256,7 +1260,7 @@ fun TgBypassDashboard() {
                     }
 
                     Text(
-                        text = "- Встроенный демон tg-ws-proxy: v1.2.3\n- Встроенный Vector Hook модуль: v2.2\n- Встроенный AyuGram Bridge плагин: v2.2",
+                        text = "- Встроенный демон tg-ws-proxy: v1.2.3\n- Встроенный Vector Hook модуль: v1.2.3\n- Встроенный AyuGram Bridge плагин: v1.2.3",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
