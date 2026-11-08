@@ -41,16 +41,89 @@ class TelegramHook : IXposedHookLoadPackage {
             "cc.modery.cherrygram",
             "org.telegram.plus",
             "nekox.messenger",
-            "org.telegram.BifToGram"
+            "org.telegram.BifToGram",
+            "org.zastogram.messenger.dev",
+            "com.radolyn.ayugram"
         )
 
         fun isTelegramIp(host: String): Boolean {
             return host.startsWith("149.154.") || host.startsWith("91.108.") || host.startsWith("185.76.151.")
         }
+
+        /**
+         * Checks whether this client has active Python/Elyx plugin mode.
+         * If plugins are enabled (and NOT in Safe Mode) with bridge plugin active:
+         * returns true -> Vector skips hooking to let Bridge Plugin handle traffic cleanly.
+         * If plugins are disabled, in Safe Mode, or missing:
+         * returns false -> Vector hook acts as safe fallback since Python engine is not running.
+         */
+        fun isPluginBypassActive(lpparam: XC_LoadPackage.LoadPackageParam): Boolean {
+            val dataDir = lpparam.appInfo?.dataDir ?: return false
+
+            // 1. Check if client has plugin directory
+            val pluginsDir = java.io.File(dataDir, "files/plugins")
+            if (!pluginsDir.exists() || !pluginsDir.isDirectory) {
+                return false
+            }
+
+            // 2. Check if bridge plugin is installed
+            val bridgeFile = java.io.File(pluginsDir, "tg_ws_vector_bridge.py")
+            if (!bridgeFile.exists()) {
+                return false
+            }
+
+            // 3. Check shared preferences for pluginsEngine and pluginsSafeMode
+            try {
+                val sharedPrefsDir = java.io.File(dataDir, "shared_prefs")
+                val prefNames = listOf("exteraconfig.xml", "ayuconfig.xml", "mainconfig.xml", "zasto_plugins.xml")
+                for (prefName in prefNames) {
+                    val prefFile = java.io.File(sharedPrefsDir, prefName)
+                    if (prefFile.exists()) {
+                        val content = prefFile.readText()
+                        // If pluginsEngine is explicitly false -> plugin mode is turned OFF by user
+                        if (content.contains("name=\"pluginsEngine\" value=\"false\"") ||
+                            content.contains("name=\"plugins_engine\" value=\"false\"")) {
+                            XposedBridge.log("[$TAG] ${lpparam.packageName}: pluginsEngine is false. Falling back to Vector Hook.")
+                            return false
+                        }
+                        // If pluginsSafeMode is explicitly true -> Safe Mode is ON
+                        if (content.contains("name=\"pluginsSafeMode\" value=\"true\"") ||
+                            content.contains("name=\"plugins_safe_mode\" value=\"true\"") ||
+                            content.contains("name=\"safe_mode\" value=\"true\"")) {
+                            XposedBridge.log("[$TAG] ${lpparam.packageName}: pluginsSafeMode is true. Falling back to Vector Hook.")
+                            return false
+                        }
+                    }
+                }
+
+                // 4. Check if bridge plugin itself is disabled in plugin_settings.xml
+                val pluginSettingsFile = java.io.File(sharedPrefsDir, "plugin_settings.xml")
+                if (pluginSettingsFile.exists()) {
+                    val content = pluginSettingsFile.readText()
+                    if (content.contains("name=\"plugin_enabled_tg_ws_vector_bridge\" value=\"false\"")) {
+                        XposedBridge.log("[$TAG] ${lpparam.packageName}: tg_ws_vector_bridge is disabled. Falling back to Vector Hook.")
+                        return false
+                    }
+                }
+            } catch (t: Throwable) {
+                XposedBridge.log("[$TAG] isPluginBypassActive check error: ${t.message}")
+            }
+
+            // Client has plugin system, plugin mode is ON, Safe Mode is OFF, and bridge plugin is present
+            return true
+        }
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (lpparam.packageName !in TARGET_PACKAGES) return
+
+        // Dynamic safety check:
+        // If bridge plugin is active and running, skip Vector hooks to avoid ART crash.
+        // If plugin mode is turned off or safe mode is on, fallback to Vector hooks safely.
+        if (isPluginBypassActive(lpparam)) {
+            XposedBridge.log("[$TAG] Active Plugin bypass detected in ${lpparam.packageName}. Skipping Vector hooks to let Bridge Plugin handle traffic cleanly.")
+            return
+        }
 
         XposedBridge.log("[$TAG] Successfully injected into Telegram client: ${lpparam.packageName}")
 
@@ -231,7 +304,6 @@ class TelegramHook : IXposedHookLoadPackage {
                         override fun beforeHookedMethod(param: MethodHookParam) {
                             val addr = param.args.getOrNull(1) as? String
                             if (addr.isNullOrBlank()) {
-                                // Prevent disabling: force local proxy
                                 param.args[1] = PROXY_HOST
                                 param.args[2] = PROXY_PORT
                                 param.args[3] = ""

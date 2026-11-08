@@ -59,10 +59,10 @@ data class LatencyInfo(
 
     fun getBadgeColor(): Color {
         return when {
-            latencyMs == null -> Color(0xFFF97575) // Red
-            latencyMs < 200 -> Color(0xFF48D597)   // Green (< 200)
-            latencyMs < 500 -> Color(0xFFFFD600)   // Yellow (< 500)
-            else -> Color(0xFFF97575)              // Red (>= 500)
+            latencyMs == null -> Color(0xFFF97575)
+            latencyMs < 200 -> Color(0xFF48D597)
+            latencyMs < 500 -> Color(0xFFFFD600)
+            else -> Color(0xFFF97575)
         }
     }
 
@@ -76,9 +76,32 @@ data class LatencyInfo(
     }
 }
 
+data class PluginEngineStatus(
+    val supported: Boolean,
+    val enabled: Boolean,
+    val safeMode: Boolean,
+    val bridgePluginInstalled: Boolean,
+    val bridgePluginEnabled: Boolean
+)
+
 object RootBridge {
     private const val TAG = "TgBypassRoot"
     const val DEFAULT_PORT = 1444
+
+    val ALL_TELEGRAM_PACKAGES = listOf(
+        Pair("com.radolyn.ayugram", "AyuGram"),
+        Pair("app.exteragram.messenger", "exteraGram"),
+        Pair("com.exteragram.messenger", "exteraGram"),
+        Pair("org.zastogram.messenger.dev", "ZaStoGram"),
+        Pair("org.telegram.messenger", "Telegram (Play/Official)"),
+        Pair("org.telegram.messenger.web", "Telegram Direct / Web"),
+        Pair("org.thunderdog.challegram", "Telegram X"),
+        Pair("org.telegram.plus", "Plus Messenger"),
+        Pair("tw.nekomimi.nekogram", "Nekogram"),
+        Pair("cc.modery.cherrygram", "Cherrygram"),
+        Pair("nekox.messenger", "NekoX"),
+        Pair("org.telegram.BifToGram", "BifToGram")
+    )
 
     // Official and ZaSto WSS Backends
     val AVAILABLE_BACKENDS = listOf(
@@ -90,15 +113,17 @@ object RootBridge {
 
     suspend fun readAyuGramSyncState(): BackendSyncInfo? = withContext(Dispatchers.IO) {
         try {
-            val out = execRoot("cat /data/data/com.radolyn.ayugram/files/plugins/tgbypass_sync.json 2>/dev/null")
-            if (out.contains("\"backend\"")) {
-                val json = org.json.JSONObject(out)
-                val backend = json.optString("backend", "")
-                val idx = json.optInt("backend_idx", 0)
-                val ts = json.optLong("timestamp", 0L)
-                val src = json.optString("source", "")
-                if (backend.isNotEmpty()) {
-                    return@withContext BackendSyncInfo(backend, idx, ts, src)
+            for ((pkg, _) in ALL_TELEGRAM_PACKAGES) {
+                val out = execRoot("cat /data/data/$pkg/files/plugins/tgbypass_sync.json 2>/dev/null")
+                if (out.contains("\"backend\"")) {
+                    val json = org.json.JSONObject(out)
+                    val backend = json.optString("backend", "")
+                    val idx = json.optInt("backend_idx", 0)
+                    val ts = json.optLong("timestamp", 0L)
+                    val src = json.optString("source", "")
+                    if (backend.isNotEmpty()) {
+                        return@withContext BackendSyncInfo(backend, idx, ts, src)
+                    }
                 }
             }
             null
@@ -109,37 +134,40 @@ object RootBridge {
 
     suspend fun pushBackendSync(backendKey: String, backendIdx: Int, timestampMs: Long): Boolean = withContext(Dispatchers.IO) {
         try {
-            val uidGid = execRoot("stat -c %u:%g /data/data/com.radolyn.ayugram 2>/dev/null").trim().ifEmpty { "10334:10334" }
-            val syncPath = "/data/data/com.radolyn.ayugram/files/plugins/tgbypass_sync.json"
-            val settingsPath = "/data/data/com.radolyn.ayugram/files/plugins/plugin_settings.json"
-
-            // 1. Write tgbypass_sync.json
             val syncJson = org.json.JSONObject().apply {
                 put("backend", backendKey)
                 put("backend_idx", backendIdx)
                 put("timestamp", timestampMs)
                 put("source", "tgbypass_app")
             }.toString()
-
             val escapedSync = syncJson.replace("\"", "\\\"")
-            execRoot("echo \"$escapedSync\" > $syncPath && chown $uidGid $syncPath && chmod 666 $syncPath")
 
-            // 2. Also update backend_idx in plugin_settings.json if it exists
-            val currentSettings = execRoot("cat $settingsPath 2>/dev/null")
-            if (currentSettings.isNotEmpty() && currentSettings.contains("{")) {
-                try {
-                    val json = org.json.JSONObject(currentSettings)
-                    val bridgeObj = json.optJSONObject("tg_ws_vector_bridge") ?: org.json.JSONObject()
-                    bridgeObj.put("backend_idx", backendIdx)
-                    json.put("tg_ws_vector_bridge", bridgeObj)
-                    val updatedStr = json.toString().replace("\"", "\\\"")
-                    execRoot("echo \"$updatedStr\" > $settingsPath && chown $uidGid $settingsPath && chmod 666 $settingsPath")
-                } catch (_: Exception) {}
+            // Sync to all installed clients that have files/plugins directory
+            for ((pkg, _) in ALL_TELEGRAM_PACKAGES) {
+                val hasDir = execRoot("test -d /data/data/$pkg/files/plugins && echo 1 || test -d /data/user/0/$pkg/files/plugins && echo 1").contains("1")
+                if (hasDir) {
+                    val uidGid = execRoot("stat -c %u:%g /data/data/$pkg 2>/dev/null").trim().ifEmpty { "1000:1000" }
+                    val syncPath = "/data/data/$pkg/files/plugins/tgbypass_sync.json"
+                    val settingsPath = "/data/data/$pkg/files/plugins/plugin_settings.json"
+
+                    execRoot("echo \"$escapedSync\" > $syncPath && chown $uidGid $syncPath && chmod 666 $syncPath")
+
+                    val currentSettings = execRoot("cat $settingsPath 2>/dev/null")
+                    if (currentSettings.isNotEmpty() && currentSettings.contains("{")) {
+                        try {
+                            val json = org.json.JSONObject(currentSettings)
+                            val bridgeObj = json.optJSONObject("tg_ws_vector_bridge") ?: org.json.JSONObject()
+                            bridgeObj.put("backend_idx", backendIdx)
+                            json.put("tg_ws_vector_bridge", bridgeObj)
+                            val updatedStr = json.toString().replace("\"", "\\\"")
+                            execRoot("echo \"$updatedStr\" > $settingsPath && chown $uidGid $settingsPath && chmod 666 $settingsPath")
+                        } catch (_: Exception) {}
+                    }
+                }
             }
 
-            // 3. Update global marker in /data/local/tmp
+            // Update global marker in /data/local/tmp
             execRoot("echo \"$backendKey\" > /data/local/tmp/tgbypass_active_backend.txt && chmod 644 /data/local/tmp/tgbypass_active_backend.txt")
-
             true
         } catch (e: Exception) {
             Log.e(TAG, "pushBackendSync error", e)
@@ -152,9 +180,7 @@ object RootBridge {
             val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
             val out = p.inputStream.bufferedReader().readText()
             p.waitFor()
-            val ok = out.contains("uid=0")
-            Log.d(TAG, "requestRoot: $ok")
-            ok
+            out.contains("uid=0")
         } catch (e: Exception) {
             Log.e(TAG, "requestRoot error", e)
             false
@@ -163,7 +189,6 @@ object RootBridge {
 
     suspend fun execRoot(cmd: String): String = withContext(Dispatchers.IO) {
         try {
-            // Use -mm (mount master) so root process can access all app directories in /data/data
             val p = try {
                 Runtime.getRuntime().exec(arrayOf("su", "-mm", "-c", cmd))
             } catch (_: Exception) {
@@ -216,85 +241,98 @@ object RootBridge {
         out.contains(pkg) && out.contains("enabled")
     }
 
+    suspend fun inspectClientPluginState(pkg: String): PluginEngineStatus = withContext(Dispatchers.IO) {
+        val hasDir = execRoot("test -d /data/data/$pkg/files/plugins && echo 1 || test -d /data/user/0/$pkg/files/plugins && echo 1").contains("1")
+        if (!hasDir) {
+            return@withContext PluginEngineStatus(
+                supported = false,
+                enabled = false,
+                safeMode = false,
+                bridgePluginInstalled = false,
+                bridgePluginEnabled = false
+            )
+        }
+
+        val bridgeInstalled = execRoot("test -f /data/data/$pkg/files/plugins/tg_ws_vector_bridge.py && echo 1").contains("1")
+
+        var engineEnabled = true
+        var safeMode = false
+        var bridgeEnabled = true
+
+        val prefs = execRoot("cat /data/data/$pkg/shared_prefs/exteraconfig.xml /data/data/$pkg/shared_prefs/ayuconfig.xml /data/data/$pkg/shared_prefs/mainconfig.xml 2>/dev/null")
+        if (prefs.contains("name=\"pluginsEngine\" value=\"false\"") || prefs.contains("name=\"plugins_engine\" value=\"false\"")) {
+            engineEnabled = false
+        }
+        if (prefs.contains("name=\"pluginsSafeMode\" value=\"true\"") || prefs.contains("name=\"plugins_safe_mode\" value=\"true\"") || prefs.contains("name=\"safe_mode\" value=\"true\"")) {
+            safeMode = true
+        }
+
+        val pluginSettings = execRoot("cat /data/data/$pkg/shared_prefs/plugin_settings.xml 2>/dev/null")
+        if (pluginSettings.contains("name=\"plugin_enabled_tg_ws_vector_bridge\" value=\"false\"")) {
+            bridgeEnabled = false
+        }
+
+        PluginEngineStatus(
+            supported = true,
+            enabled = engineEnabled,
+            safeMode = safeMode,
+            bridgePluginInstalled = bridgeInstalled,
+            bridgePluginEnabled = bridgeEnabled
+        )
+    }
+
     suspend fun getInstalledTelegramClients(context: Context): List<TelegramClientInfo> = withContext(Dispatchers.IO) {
         val list = mutableListOf<TelegramClientInfo>()
         val pm = context.packageManager
         val vectorScope = execRoot("/data/adb/lspd/cli scope ls com.windyx0.tgbypass 2>/dev/null")
 
-        // 1. AyuGram
-        val ayuInstalled = try {
-            pm.getPackageInfo("com.radolyn.ayugram", 0) != null
-        } catch (_: Exception) {
-            execRoot("pm path com.radolyn.ayugram 2>/dev/null").isNotEmpty()
-        }
-        if (ayuInstalled) {
-            val existsOut = execRoot("test -f /data/data/com.radolyn.ayugram/files/plugins/tg_ws_vector_bridge.py && echo 1")
-            val pluginExists = existsOut.contains("1")
-
-            val xml = execRoot("cat /data/data/com.radolyn.ayugram/shared_prefs/plugin_settings.xml 2>/dev/null")
-            val pluginEnabled = xml.contains("plugin_enabled_tg_ws_vector_bridge") && 
-                    (xml.contains("\"true\"") || xml.contains(">true<") || xml.contains("true"))
-
-            val isOk = pluginExists && pluginEnabled
-            val detail = when {
-                isOk -> "Мост-плагин активен (127.0.0.1:1444)"
-                pluginExists -> "Плагин отключен в настройках"
-                else -> "Плагин не установлен"
-            }
-            Log.d(TAG, "AyuGram check: exists=$pluginExists, enabled=$pluginEnabled, isOk=$isOk, xmlLen=${xml.length}")
-            list.add(TelegramClientInfo(
-                packageName = "com.radolyn.ayugram",
-                name = "AyuGram",
-                isInstalled = true,
-                method = BypassMethod.AYUGRAM_PLUGIN,
-                isConfigured = isOk,
-                detail = detail
-            ))
-        }
-
-        // 2. ZaStoGram (Official ZaSto Telegram Fork with native WSS)
-        val zastoInstalled = try {
-            pm.getPackageInfo("org.zastogram.messenger.dev", 0) != null
-        } catch (_: Exception) {
-            execRoot("pm path org.zastogram.messenger.dev 2>/dev/null").isNotEmpty()
-        }
-        if (zastoInstalled) {
-            list.add(TelegramClientInfo(
-                packageName = "org.zastogram.messenger.dev",
-                name = "ZaStoGram",
-                isInstalled = true,
-                method = BypassMethod.VECTOR_HOOK,
-                isConfigured = true,
-                detail = "Встроенный WSS-транспорт активен"
-            ))
-        }
-
-        // 3. Other clients (routed via Vector module hook)
-        val otherClients = listOf(
-            Triple("org.telegram.messenger", "Telegram (Play/Official)", BypassMethod.VECTOR_HOOK),
-            Triple("org.telegram.messenger.web", "Telegram Direct / Web", BypassMethod.VECTOR_HOOK),
-            Triple("app.exteragram.messenger", "exteraGram", BypassMethod.VECTOR_HOOK),
-            Triple("org.thunderdog.challegram", "Telegram X", BypassMethod.VECTOR_HOOK),
-            Triple("org.telegram.plus", "Plus Messenger", BypassMethod.VECTOR_HOOK),
-            Triple("tw.nekomimi.nekogram", "Nekogram", BypassMethod.VECTOR_HOOK),
-            Triple("cc.modery.cherrygram", "Cherrygram", BypassMethod.VECTOR_HOOK)
-        )
-
-        for ((pkg, name, method) in otherClients) {
+        for ((pkg, name) in ALL_TELEGRAM_PACKAGES) {
             val installed = try {
                 pm.getPackageInfo(pkg, 0) != null
             } catch (_: Exception) {
                 execRoot("pm path $pkg 2>/dev/null").isNotEmpty()
             }
-            if (installed) {
-                val inScope = vectorScope.contains(pkg)
+            if (!installed) continue
+
+            val inScope = vectorScope.contains(pkg)
+            val pluginStatus = inspectClientPluginState(pkg)
+
+            if (pluginStatus.supported && pluginStatus.enabled && !pluginStatus.safeMode) {
+                // Client with active plugin mode
+                val isOk = pluginStatus.bridgePluginInstalled && pluginStatus.bridgePluginEnabled
+                val detail = when {
+                    isOk -> "Мост-плагин активен (127.0.0.1:1444)"
+                    pluginStatus.bridgePluginInstalled -> "Плагин отключен в настройках"
+                    else -> "Плагин не установлен"
+                }
                 list.add(TelegramClientInfo(
                     packageName = pkg,
                     name = name,
                     isInstalled = true,
-                    method = method,
-                    isConfigured = inScope,
-                    detail = if (inScope) "Vector Hook активен" else "Не в области действия Vector"
+                    method = BypassMethod.AYUGRAM_PLUGIN,
+                    isConfigured = isOk,
+                    detail = detail
+                ))
+            } else {
+                // Client without plugins OR plugins turned off / Safe Mode active -> Vector Hook fallback
+                val detail = when {
+                    pluginStatus.supported && pluginStatus.safeMode -> {
+                        if (inScope) "Безопасный режим -> Vector Hook активен" else "Безопасный режим -> Не в области Vector"
+                    }
+                    pluginStatus.supported && !pluginStatus.enabled -> {
+                        if (inScope) "Плагины выкл -> Vector Hook активен" else "Плагины выкл -> Не в области Vector"
+                    }
+                    pkg == "org.zastogram.messenger.dev" -> "Встроенный WSS-транспорт активен"
+                    inScope -> "Vector Hook активен"
+                    else -> "Не в области действия Vector"
+                }
+                list.add(TelegramClientInfo(
+                    packageName = pkg,
+                    name = name,
+                    isInstalled = true,
+                    method = BypassMethod.VECTOR_HOOK,
+                    isConfigured = inScope || pkg == "org.zastogram.messenger.dev",
+                    detail = detail
                 ))
             }
         }
@@ -304,67 +342,68 @@ object RootBridge {
 
     suspend fun autoInstallAndFixAll(context: Context): String = withContext(Dispatchers.IO) {
         val sb = StringBuilder()
+        val pluginBytes = try {
+            context.assets.open("tg_ws_vector_bridge.py").use { it.readBytes() }
+        } catch (_: Exception) { null }
 
-        // 1. Install / repair AyuGram Bridge Plugin
-        val ayuInstalled = execRoot("pm path com.radolyn.ayugram 2>/dev/null").isNotEmpty()
-        if (ayuInstalled) {
-            try {
-                val pluginBytes = context.assets.open("tg_ws_vector_bridge.py").use { it.readBytes() }
-                val tmpFile = java.io.File(context.cacheDir, "tg_ws_vector_bridge.py")
-                tmpFile.writeBytes(pluginBytes)
+        val tmpFile = if (pluginBytes != null) {
+            val f = java.io.File(context.cacheDir, "tg_ws_vector_bridge.py")
+            f.writeBytes(pluginBytes)
+            f
+        } else null
 
-                val uidGid = execRoot("stat -c %u:%g /data/data/com.radolyn.ayugram 2>/dev/null").trim().ifEmpty { "10334:10334" }
-                val targetDir = "/data/data/com.radolyn.ayugram/files/plugins"
-                val prefsFile = "/data/data/com.radolyn.ayugram/shared_prefs/plugin_settings.xml"
+        // 1. Ensure Vector module is enabled in LSPosed/Vector
+        execRoot("/data/adb/lspd/cli modules enable com.windyx0.tgbypass 2>/dev/null")
 
-                execRoot("mkdir -p $targetDir")
-                execRoot("cp ${tmpFile.absolutePath} $targetDir/tg_ws_vector_bridge.py")
-                execRoot("cp ${tmpFile.absolutePath} $targetDir/.temp_tg_ws_vector_bridge.plugin")
-                execRoot("chown $uidGid $targetDir/tg_ws_vector_bridge.py $targetDir/.temp_tg_ws_vector_bridge.plugin")
-                execRoot("chmod 600 $targetDir/tg_ws_vector_bridge.py $targetDir/.temp_tg_ws_vector_bridge.plugin")
+        // 2. Scan each installed client and automatically configure plugins vs Vector hook
+        for ((pkg, name) in ALL_TELEGRAM_PACKAGES) {
+            val installed = execRoot("pm path $pkg 2>/dev/null").isNotEmpty()
+            if (!installed) continue
 
-                // Enable plugin in plugin_settings.xml
-                val xml = execRoot("cat $prefsFile 2>/dev/null")
-                if (!xml.contains("plugin_enabled_tg_ws_vector_bridge")) {
-                    if (xml.contains("</map>")) {
-                        val updated = xml.replace("</map>", "    <boolean name=\"plugin_enabled_tg_ws_vector_bridge\" value=\"true\" />\n</map>")
-                        val tmpXml = java.io.File(context.cacheDir, "plugin_settings.xml")
-                        tmpXml.writeText(updated)
-                        execRoot("cp ${tmpXml.absolutePath} $prefsFile")
-                        execRoot("chown $uidGid $prefsFile")
-                        execRoot("chmod 660 $prefsFile")
+            val pluginStatus = inspectClientPluginState(pkg)
+
+            if (pluginStatus.supported) {
+                // Deploy / update bridge plugin
+                if (tmpFile != null) {
+                    val uidGid = execRoot("stat -c %u:%g /data/data/$pkg 2>/dev/null").trim().ifEmpty { "1000:1000" }
+                    val targetDir = "/data/data/$pkg/files/plugins"
+                    val prefsFile = "/data/data/$pkg/shared_prefs/plugin_settings.xml"
+
+                    execRoot("mkdir -p $targetDir")
+                    execRoot("cp ${tmpFile.absolutePath} $targetDir/tg_ws_vector_bridge.py")
+                    execRoot("cp ${tmpFile.absolutePath} $targetDir/.temp_tg_ws_vector_bridge.plugin")
+                    execRoot("chown -R $uidGid $targetDir")
+                    execRoot("chmod 600 $targetDir/tg_ws_vector_bridge.py $targetDir/.temp_tg_ws_vector_bridge.plugin")
+
+                    val xml = execRoot("cat $prefsFile 2>/dev/null")
+                    if (!xml.contains("plugin_enabled_tg_ws_vector_bridge")) {
+                        if (xml.contains("</map>")) {
+                            val updated = xml.replace("</map>", "    <boolean name=\"plugin_enabled_tg_ws_vector_bridge\" value=\"true\" />\n</map>")
+                            val tmpXml = java.io.File(context.cacheDir, "plugin_settings.xml")
+                            tmpXml.writeText(updated)
+                            execRoot("cp ${tmpXml.absolutePath} $prefsFile")
+                            execRoot("chown $uidGid $prefsFile")
+                            execRoot("chmod 660 $prefsFile")
+                        }
                     }
                 }
 
-                // CRITICAL: Ensure AyuGram is NOT in Vector scope to prevent ART crash
-                execRoot("/data/adb/lspd/cli scope rm com.windyx0.tgbypass com.radolyn.ayugram/0 2>/dev/null")
-                sb.append("AyuGram: мост-плагин установлен и активирован.\n")
-            } catch (e: Exception) {
-                sb.append("AyuGram: ошибка установки (${e.message})\n")
-            }
-        }
-
-        // 2. Enable Vector module and add non-AyuGram clients to scope
-        execRoot("/data/adb/lspd/cli modules enable com.windyx0.tgbypass 2>/dev/null")
-        val otherPackages = listOf(
-            "org.telegram.messenger",
-            "org.telegram.messenger.web",
-            "app.exteragram.messenger",
-            "org.thunderdog.challegram",
-            "org.telegram.plus",
-            "tw.nekomimi.nekogram",
-            "cc.modery.cherrygram",
-            "org.zastogram.messenger.dev"
-        )
-        var addedCount = 0
-        for (pkg in otherPackages) {
-            val installed = execRoot("pm path $pkg 2>/dev/null").isNotEmpty()
-            if (installed) {
+                // If plugins are enabled and safe mode is OFF:
+                if (pluginStatus.enabled && !pluginStatus.safeMode) {
+                    // Remove from Vector scope to prevent ART crash
+                    execRoot("/data/adb/lspd/cli scope rm com.windyx0.tgbypass $pkg/0 2>/dev/null")
+                    sb.append("$name: мост-плагин активен (Vector Hook исключен во избежание краша).\n")
+                } else {
+                    // Safe mode is ON or plugins are disabled -> fallback to Vector Hook!
+                    execRoot("/data/adb/lspd/cli scope add com.windyx0.tgbypass $pkg/0 2>/dev/null")
+                    sb.append("$name: плагины не активны -> подключен Vector Hook.\n")
+                }
+            } else {
+                // Client has no plugin engine -> Vector Hook
                 execRoot("/data/adb/lspd/cli scope add com.windyx0.tgbypass $pkg/0 2>/dev/null")
-                addedCount++
+                sb.append("$name: Vector Hook добавлен в область действия.\n")
             }
         }
-        sb.append("Vector: область действия обновлена ($addedCount приложений).\n")
 
         // 3. Ensure proxy daemon is alive
         if (!isPortListening()) {
@@ -430,12 +469,14 @@ object RootBridge {
             val pm = context.packageManager
             val known = listOf(
                 "com.radolyn.ayugram",
+                "app.exteragram.messenger",
+                "com.exteragram.messenger",
                 "org.zastogram.messenger.dev",
                 "org.telegram.messenger",
-                "app.exteragram.messenger",
                 "org.thunderdog.challegram",
                 "tw.nekomimi.nekogram",
-                "cc.modery.cherrygram"
+                "cc.modery.cherrygram",
+                "org.telegram.plus"
             )
             val launchIntents = mutableListOf<Intent>()
             for (pkg in known) {

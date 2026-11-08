@@ -21,27 +21,55 @@ if [ -f "$MODDIR/scripts/net_accelerator.sh" ]; then
     sh "$MODDIR/scripts/net_accelerator.sh" >/dev/null 2>&1
 fi
 
-# 2. Check and ensure Vector module is enabled & scoped (excluding AyuGram which uses bridge plugin)
+# 2. Dynamic scanner: Auto-check TG clients for plugins vs Safe Mode / Vector
+APP_ID="com.windyx0.tgbypass"
 if [ -x /data/adb/lspd/cli ]; then
-    /data/adb/lspd/cli modules enable com.windyx0.tgbypass >/dev/null 2>&1
-    /data/adb/lspd/cli scope add com.windyx0.tgbypass org.telegram.messenger/0 org.telegram.messenger.web/0 app.exteragram.messenger/0 org.telegram.plus/0 org.thunderdog.challegram/0 >/dev/null 2>&1
-    /data/adb/lspd/cli scope rm com.windyx0.tgbypass com.radolyn.ayugram/0 >/dev/null 2>&1
+    /data/adb/lspd/cli modules enable "$APP_ID" >/dev/null 2>&1
 fi
 
-# Ensure AyuGram Bridge Plugin is installed if AyuGram exists
-if [ -d /data/data/com.radolyn.ayugram/files/plugins ] && [ -f "$MODDIR/scripts/tg_ws_vector_bridge.py" ]; then
-    UID_GID=$(stat -c %u:%g /data/data/com.radolyn.ayugram 2>/dev/null || echo "10334:10334")
-    TARGET_DIR="/data/data/com.radolyn.ayugram/files/plugins"
-    PREFS="/data/data/com.radolyn.ayugram/shared_prefs/plugin_settings.xml"
-    cp "$MODDIR/scripts/tg_ws_vector_bridge.py" "$TARGET_DIR/tg_ws_vector_bridge.py"
-    cp "$MODDIR/scripts/tg_ws_vector_bridge.py" "$TARGET_DIR/.temp_tg_ws_vector_bridge.plugin"
-    chown $UID_GID "$TARGET_DIR/tg_ws_vector_bridge.py" "$TARGET_DIR/.temp_tg_ws_vector_bridge.plugin"
-    chmod 600 "$TARGET_DIR/tg_ws_vector_bridge.py" "$TARGET_DIR/.temp_tg_ws_vector_bridge.plugin"
-    if [ -f "$PREFS" ] && ! grep -q "plugin_enabled_tg_ws_vector_bridge" "$PREFS"; then
-        sed -i 's|</map>|    <boolean name="plugin_enabled_tg_ws_vector_bridge" value="true" />\n</map>|' "$PREFS"
-        chown $UID_GID "$PREFS"
+TG_CANDIDATES="com.radolyn.ayugram app.exteragram.messenger com.exteragram.messenger org.zastogram.messenger.dev org.telegram.messenger org.telegram.messenger.web org.thunderdog.challegram org.telegram.plus tw.nekomimi.nekogram cc.modery.cherrygram nekox.messenger"
+
+for pkg in $TG_CANDIDATES; do
+    if pm path "$pkg" >/dev/null 2>&1; then
+        DATA_DIR="/data/data/$pkg"
+        [ ! -d "$DATA_DIR" ] && DATA_DIR="/data/user/0/$pkg"
+
+        if [ -d "$DATA_DIR/files/plugins" ] || [ -f "$DATA_DIR/files/python_version" ] || [ -f "$DATA_DIR/files/chaquopy" ]; then
+            if [ -f "$MODDIR/scripts/tg_ws_vector_bridge.py" ]; then
+                P_UID=$(stat -c %u:%g "$DATA_DIR" 2>/dev/null || echo "1000:1000")
+                mkdir -p "$DATA_DIR/files/plugins"
+                cp "$MODDIR/scripts/tg_ws_vector_bridge.py" "$DATA_DIR/files/plugins/tg_ws_vector_bridge.py"
+                cp "$MODDIR/scripts/tg_ws_vector_bridge.py" "$DATA_DIR/files/plugins/.temp_tg_ws_vector_bridge.plugin"
+                chown -R $P_UID "$DATA_DIR/files/plugins"
+                chmod 600 "$DATA_DIR/files/plugins/tg_ws_vector_bridge.py" "$DATA_DIR/files/plugins/.temp_tg_ws_vector_bridge.plugin"
+
+                PREFS="$DATA_DIR/shared_prefs/plugin_settings.xml"
+                if [ -f "$PREFS" ] && ! grep -q "plugin_enabled_tg_ws_vector_bridge" "$PREFS"; then
+                    sed -i 's|</map>|    <boolean name="plugin_enabled_tg_ws_vector_bridge" value="true" />\n</map>|' "$PREFS"
+                    chown $P_UID "$PREFS"
+                fi
+            fi
+
+            SAFE_MODE="0"
+            PLUGINS_OFF="0"
+            ALL_PREFS=$(cat "$DATA_DIR/shared_prefs/exteraconfig.xml" "$DATA_DIR/shared_prefs/ayuconfig.xml" "$DATA_DIR/shared_prefs/mainconfig.xml" 2>/dev/null)
+            if echo "$ALL_PREFS" | grep -q 'name="pluginsSafeMode" value="true"'; then
+                SAFE_MODE="1"
+            fi
+            if echo "$ALL_PREFS" | grep -q 'name="pluginsEngine" value="false"'; then
+                PLUGINS_OFF="1"
+            fi
+
+            if [ "$SAFE_MODE" = "1" ] || [ "$PLUGINS_OFF" = "1" ]; then
+                [ -x /data/adb/lspd/cli ] && /data/adb/lspd/cli scope add "$APP_ID" "$pkg/0" >/dev/null 2>&1
+            else
+                [ -x /data/adb/lspd/cli ] && /data/adb/lspd/cli scope rm "$APP_ID" "$pkg/0" >/dev/null 2>&1
+            fi
+        else
+            [ -x /data/adb/lspd/cli ] && /data/adb/lspd/cli scope add "$APP_ID" "$pkg/0" >/dev/null 2>&1
+        fi
     fi
-fi
+done
 
 # 3. Check Autostart configuration
 AUTOSTART="1"
