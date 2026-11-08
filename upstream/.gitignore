@@ -64,3 +64,7 @@ Thumbs.db
 
 # Gradle build outputs (app/build already listed; keep explicit)
 app/build/
+
+xposed-stub/build/
+tgbypass/build/
+build/
