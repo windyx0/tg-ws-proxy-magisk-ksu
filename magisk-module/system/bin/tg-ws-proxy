@@ -1,0 +1,9 @@
+#!/system/bin/sh
+# CLI shortcut for Telegram WS Proxy Controller
+MODDIR="/data/adb/modules/tg_ws_proxy"
+if [ -f "$MODDIR/scripts/proxy_ctl.sh" ]; then
+    exec sh "$MODDIR/scripts/proxy_ctl.sh" "$@"
+else
+    echo "Error: tg-ws-proxy module directory not found at $MODDIR"
+    exit 1
+fi

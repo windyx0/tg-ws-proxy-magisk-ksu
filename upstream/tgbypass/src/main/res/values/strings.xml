@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TgBypass</string>
+    <string name="xposed_description">Прямой авто-обход блокировок Telegram через Vector / LSPosed</string>
+</resources>

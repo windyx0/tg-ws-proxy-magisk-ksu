@@ -1,0 +1,70 @@
+[
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-xxxhdpi_ic_launcher_background_img.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-xxxhdpi/ic_launcher_background_img.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-xxhdpi_ic_launcher_tgwsproxy_foreground_v2.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-xxhdpi/ic_launcher_tgwsproxy_foreground_v2.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-xhdpi_ic_launcher_tgwsproxy_foreground_v2.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-xhdpi/ic_launcher_tgwsproxy_foreground_v2.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/drawable_ic_quick_settings_tile.xml.flat",
+        "source": "com.windyx0.tgbypass-main-42:/drawable/ic_quick_settings_tile.xml"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-anydpi-v26_ic_launcher_tgwsproxy_round_v2.xml.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-anydpi-v26/ic_launcher_tgwsproxy_round_v2.xml"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/drawable-nodpi_ic_launcher_tgwsproxy_monochrome_v2.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/drawable-nodpi/ic_launcher_tgwsproxy_monochrome_v2.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-anydpi-v26_ic_launcher_tgwsproxy_v2.xml.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-anydpi-v26/ic_launcher_tgwsproxy_v2.xml"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-xxxhdpi_ic_launcher_tgwsproxy_foreground_v2.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-xxxhdpi/ic_launcher_tgwsproxy_foreground_v2.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/drawable_app_bg.webp.flat",
+        "source": "com.windyx0.tgbypass-main-42:/drawable/app_bg.webp"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-hdpi_ic_launcher_tgwsproxy_foreground_v2.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-hdpi/ic_launcher_tgwsproxy_foreground_v2.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-mdpi_ic_launcher_background_img.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-mdpi/ic_launcher_background_img.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-mdpi_ic_launcher_tgwsproxy_foreground_v2.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-mdpi/ic_launcher_tgwsproxy_foreground_v2.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-hdpi_ic_launcher_background_img.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-hdpi/ic_launcher_background_img.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-xhdpi_ic_launcher_background_img.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-xhdpi/ic_launcher_background_img.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/mipmap-xxhdpi_ic_launcher_background_img.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/mipmap-xxhdpi/ic_launcher_background_img.png"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/drawable_ic_notification_small_v2.xml.flat",
+        "source": "com.windyx0.tgbypass-main-42:/drawable/ic_notification_small_v2.xml"
+    },
+    {
+        "merged": "com.windyx0.tgbypass-merged_res-41:/drawable-nodpi_notification_app_icon_v2.png.flat",
+        "source": "com.windyx0.tgbypass-main-42:/drawable-nodpi/notification_app_icon_v2.png"
+    }
+]

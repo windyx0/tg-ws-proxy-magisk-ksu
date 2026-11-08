@@ -1,0 +1,41 @@
+#!/sbin/sh
+##########################################################################################
+#
+# Magisk / KernelSU / APatch Module Installer
+#
+##########################################################################################
+
+UMASK=022
+OUTFD=$2
+ZIPFILE=$3
+
+ui_print() {
+  echo -e "ui_print $1\nui_print" >> /proc/self/fd/$OUTFD
+}
+
+# Load util_functions.sh from Magisk/KSU/APatch
+if [ -f /data/adb/magisk/util_functions.sh ]; then
+  . /data/adb/magisk/util_functions.sh
+elif [ -f /data/adb/ksu/util_functions.sh ]; then
+  . /data/adb/ksu/util_functions.sh
+elif [ -f /data/adb/ap/util_functions.sh ]; then
+  . /data/adb/ap/util_functions.sh
+fi
+
+# If executed inside standard Magisk environment, Magisk handles the rest
+if [ -n "$MAGISK_VER" ] || [ -n "$KSU" ] || [ -n "$APATCH" ]; then
+  install_module
+  exit 0
+fi
+
+# Recovery fallback loader
+TMPDIR=/dev/tmp
+mkdir -p "$TMPDIR"
+unzip -o "$ZIPFILE" -d "$TMPDIR" >/dev/null 2>&1
+if [ -f "$TMPDIR/customize.sh" ]; then
+  MODPATH=/data/adb/modules/tg_ws_proxy
+  mkdir -p "$MODPATH"
+  cp -af "$TMPDIR/"* "$MODPATH/"
+  . "$TMPDIR/customize.sh"
+fi
+exit 0

@@ -1,0 +1,38 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.65"
+        android:scaleY="0.65"
+        android:translateX="18.9"
+        android:translateY="18.9">
+        <!-- Shield Background Container -->
+        <path
+            android:fillColor="#1E293B"
+            android:pathData="M54,14 L24,26 C24,56 36,80 54,94 C72,80 84,56 84,26 Z" />
+        <!-- Shield Border (Material You Primary / Cyan) -->
+        <path
+            android:strokeColor="#70D2FF"
+            android:strokeWidth="3.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M54,14 L24,26 C24,56 36,80 54,94 C72,80 84,56 84,26 Z" />
+        <!-- Inner Glow Ring / Bypass Wave (Mint Green) -->
+        <path
+            android:strokeColor="#80E3B6"
+            android:strokeWidth="2.5"
+            android:strokeLineCap="round"
+            android:pathData="M38,50 C38,62 45,72 54,78 C63,72 70,62 70,50" />
+        <!-- Material Design Telegram Paper Airplane (White & Cyan) -->
+        <!-- Main Wing Right -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M72,36 L34,51.5 L47.5,56 L64,43 L50.5,57.5 L50,68 L56,62 L66,69 Z" />
+        <!-- Shaded Wing Left -->
+        <path
+            android:fillColor="#70D2FF"
+            android:pathData="M47.5,56 L50,68 L53.5,60.5 Z" />
+    </group>
+</vector>

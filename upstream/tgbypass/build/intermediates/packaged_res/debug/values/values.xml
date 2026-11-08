@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="xposed_scope">
+        <item>com.radolyn.ayugram</item>
+        <item>org.telegram.messenger</item>
+        <item>org.telegram.messenger.web</item>
+        <item>org.telegram.messenger.beta</item>
+        <item>org.thunderdog.challegram</item>
+        <item>app.exteragram.messenger</item>
+        <item>tw.nekomimi.nekogram</item>
+        <item>cc.modery.cherrygram</item>
+        <item>org.telegram.plus</item>
+        <item>nekox.messenger</item>
+    </string-array>
+    <color name="ic_launcher_background">#0F172A</color>
+    <color name="md3_icon_background">#0F172A</color>
+    <color name="md3_icon_surface">#1E293B</color>
+    <color name="md3_primary">#70D2FF</color>
+    <color name="md3_secondary">#80E3B6</color>
+    <string name="app_name">TgBypass</string>
+    <string name="xposed_description">Прямой авто-обход блокировок Telegram через Vector / LSPosed</string>
+</resources>

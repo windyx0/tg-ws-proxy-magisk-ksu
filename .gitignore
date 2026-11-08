@@ -1,0 +1,53 @@
+# External cloned reference repos and intermediate research
+zastogram/
+apk_decompiled/
+app-enhancements/
+elyx-direct-bypass/
+elyx-plugin/
+module-direct-bypass/
+exitfy.py
+set_ksu.sh
+zipalign.py
+
+# Gradle and Android build outputs
+.gradle/
+build/
+**/build/
+**/build/**
+upstream/*/build/
+upstream/**/build/
+*.apk
+*.aab
+local.properties
+.cxx/
+captures/
+
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Release outputs and intermediate archives
+release/*.apk
+release/*.zip
+
+# Temporary development files in root
+*.png
+*.txt
+*.xml
+*.keystore
+*.json
+!magisk-module/**
+!upstream/**
+
+# OS files
+Thumbs.db
+.DS_Store

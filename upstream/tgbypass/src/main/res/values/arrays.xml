@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="xposed_scope">
+        <item>com.radolyn.ayugram</item>
+        <item>org.telegram.messenger</item>
+        <item>org.telegram.messenger.web</item>
+        <item>org.telegram.messenger.beta</item>
+        <item>org.thunderdog.challegram</item>
+        <item>app.exteragram.messenger</item>
+        <item>tw.nekomimi.nekogram</item>
+        <item>cc.modery.cherrygram</item>
+        <item>org.telegram.plus</item>
+        <item>nekox.messenger</item>
+    </string-array>
+</resources>

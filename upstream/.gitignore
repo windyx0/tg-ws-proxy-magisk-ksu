@@ -1,0 +1,66 @@
+.gradle/
+.vscode/
+local.properties
+app/build/
+artifacts/
+dist/
+external/upstreams/
+app/src/main/jniLibs/**/*.so
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+secrets/
+release-signing.env
+
+# Private project governance files (local only; never publish)
+/AGENTS.md
+/.project-rules/
+/README_TEMPLATE.md
+/README_TEMPLATE_EN.md
+/README_*_TEMPLATE.md
+/RELEASE_TEMPLATE.md
+/RELEASE_TEMPLATE_EN.md
+/RELEASE_*_TEMPLATE.md
+/GITHUB_RELEASE_BODY_TEMPLATE.md
+/CHANGELOG_TEMPLATE.md
+/docs/ai-prompts/
+/docs/private/
+
+# Local AI/tool state (not published in repo)
+/.cursor/
+/.codex/
+/.claude/
+/.ai/
+
+# Project-local development principles copy
+/docs/development/development-principles.md
+
+# Local environment and secret files
+.env
+.env.*
+!.env.example
+*.local
+*.secret
+*.secrets
+
+# Local logs and captures (do not commit)
+app-current.log
+*.log
+runtime-logs/
+readme_images/
+*.tmp
+
+# Local keystores (release signing stays outside git)
+debug.keystore
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Gradle build outputs (app/build already listed; keep explicit)
+app/build/

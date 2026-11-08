@@ -1,0 +1,228 @@
+package com.amurcanov.tgwsproxy
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ProxyRuntimeMetricsTest {
+    @Test
+    fun parseStatus_mapsFields() {
+        val raw = "running=1;mode=auto;route=cf_worker_ws;active_route_kind=cf_worker_ws;transport_type=websocket;" +
+            "policy_generation=7;allowed_routes=cf_worker_ws|cf_proxy_ws;preferred_route=cf_worker_ws;" +
+            "active=4;bytes_up=100;bytes_down=200;latency_ms=210;last_error=;" +
+            "worker_endpoint_pool_hits=3;worker_endpoint_pool_misses=5;" +
+            "worker_ws_preconnect_enabled=0;worker_ws_preconnect_hits=0;worker_ws_preconnect_misses=0;" +
+            "worker_ws_preconnect_idle=0;worker_ws_preconnect_refill_errors=0;" +
+            "cf_pool_hits=4;cf_pool_misses=2;cf_pool_idle=1;cf_pool_refill_errors=0"
+        val metrics = ProxyRuntimeMetrics.parseStatus(raw)!!
+        assertTrue(metrics.running)
+        assertEquals("auto", metrics.mode)
+        assertEquals("cf_worker_ws", metrics.route)
+        assertEquals("cf_worker_ws", metrics.activeRouteKind)
+        assertEquals("cf_worker_ws", metrics.routeRuntime.activeRoute)
+        assertEquals("websocket", metrics.transportType)
+        assertEquals(7L, metrics.policyGeneration)
+        assertEquals("cf_worker_ws|cf_proxy_ws", metrics.allowedRoutes)
+        assertEquals("cf_worker_ws", metrics.preferredRoute)
+        assertEquals(4, metrics.activeConnections)
+        assertEquals(100, metrics.bytesUp)
+        assertEquals(200, metrics.bytesDown)
+        assertEquals(210, metrics.lastLatencyMs)
+        assertEquals(3, metrics.workerEndpointPoolHits)
+        assertEquals(5, metrics.workerEndpointPoolMisses)
+        assertFalse(metrics.workerWsPreconnectEnabled)
+        assertEquals(0, metrics.workerWsPreconnectHits)
+        assertEquals(0, metrics.workerWsPreconnectMisses)
+        assertEquals(0, metrics.workerWsPreconnectIdle)
+        assertEquals(0, metrics.workerWsPreconnectErrors)
+        assertEquals(4, metrics.cfPoolHits)
+        assertEquals(2, metrics.cfPoolMisses)
+        assertEquals(1, metrics.cfPoolIdle)
+        assertEquals(0, metrics.cfPoolErrors)
+    }
+
+    @Test
+    fun parseStatus_defaultsPoolMetricsToZero() {
+        val metrics = ProxyRuntimeMetrics.parseStatus("running=1;mode=auto")!!
+        assertEquals(0, metrics.workerEndpointPoolHits)
+        assertEquals(0, metrics.workerEndpointPoolMisses)
+        assertFalse(metrics.workerWsPreconnectEnabled)
+        assertEquals(0, metrics.workerWsPreconnectHits)
+        assertEquals(0, metrics.cfPoolHits)
+        assertEquals(0, metrics.cfPoolMisses)
+        assertEquals(0, metrics.cfPoolIdle)
+        assertEquals(0, metrics.cfPoolErrors)
+    }
+
+    @Test
+    fun fromMtProtoStatus_mapsRouteAndConnectionsForNotification() {
+        val status = MtProtoNativeStatus.parse(
+            "status=LISTENING_ROUTE_READY;host=127.0.0.1;port=1443;" +
+                "outbound=MTPROTO_ROUTE_CHAIN_READY;selected_backend=cf_proxy_ws;" +
+                "actual_backend=cf_proxy_ws;fallback_used=false;route_reason=connected;" +
+                "active=3;total=9;last_error=none;secret_fingerprint=abcdef123456",
+        )
+
+        val metrics = ProxyRuntimeMetrics.fromMtProtoStatus(status)
+
+        assertTrue(metrics.running)
+        assertEquals("mtproto", metrics.mode)
+        assertEquals("cf_proxy_ws", metrics.activeRouteKind)
+        assertEquals("mtproto", metrics.routeRuntime.configuredMode)
+        assertEquals("cf_proxy_ws", metrics.routeRuntime.selectedRoute)
+        assertEquals("cf_proxy_ws", metrics.routeRuntime.activeRoute)
+        assertEquals("cf_proxy_ws", metrics.routeRuntime.lastSuccessfulRoute)
+        assertEquals("", metrics.routeRuntime.fallbackReason)
+        assertEquals("websocket", metrics.transportType)
+        assertEquals(3L, metrics.activeConnections)
+        assertEquals(9L, metrics.totalConnections)
+        assertEquals("", metrics.lastError)
+    }
+
+    @Test
+    fun mtProtoStatus_tcpToAwgFallbackShowsActualAwgAndRequestedTcp() {
+        val status = MtProtoNativeStatus.parse(
+            "status=LISTENING_ROUTE_READY;selected_backend=direct_tcp;" +
+                "actual_backend=awg_warp;fallback_used=true;route_reason=connected;" +
+                "active=2;total=5;last_error=none",
+        )
+        val metrics = ProxyRuntimeMetrics.fromMtProtoStatus(status)
+
+        assertEquals("awg_warp", metrics.currentRouteKind)
+        assertEquals("awg_warp", metrics.routeRuntime.activeRoute)
+        assertEquals("tcp_fallback", metrics.routeRuntime.selectedRoute)
+        assertEquals("awg_warp", metrics.routeRuntime.lastSuccessfulRoute)
+        assertEquals("tcp", metrics.transportType)
+        assertEquals("", metrics.routeRuntime.fallbackReason)
+    }
+
+    @Test
+    fun mtProtoStatus_withoutConfirmedConnectionDoesNotPretendTcpIsActive() {
+        val status = MtProtoNativeStatus.parse(
+            "status=LISTENING_ROUTE_READY;selected_backend=direct_tcp;" +
+                "actual_backend=none;fallback_used=false;route_reason=handshake_failed;" +
+                "active=1;total=2",
+        )
+        val metrics = ProxyRuntimeMetrics.fromMtProtoStatus(status)
+
+        assertTrue(metrics.running)
+        assertEquals("", metrics.currentRouteKind)
+        assertEquals("", metrics.routeRuntime.activeRoute)
+        assertEquals("", metrics.routeRuntime.lastSuccessfulRoute)
+        assertEquals("tcp_fallback", metrics.routeRuntime.selectedRoute)
+        assertEquals("", metrics.transportType)
+    }
+
+    @Test
+    fun mtProtoStatus_directTcpNativeBackendMapsToFallbackLabelAndTransport() {
+        val status = MtProtoNativeStatus.parse(
+            "status=LISTENING_ROUTE_READY;selected_backend=direct_tcp;" +
+                "actual_backend=direct_tcp;fallback_used=false;route_reason=connected",
+        )
+        val metrics = ProxyRuntimeMetrics.fromMtProtoStatus(status)
+
+        assertEquals("tcp_fallback", metrics.currentRouteKind)
+        assertEquals("tcp_fallback", metrics.routeRuntime.activeRoute)
+        assertEquals("tcp", metrics.transportType)
+        assertEquals(R.string.route_display_tcp_fallback,
+            RouteDisplayNames.routeLabelRes("direct_tcp"))
+    }
+
+    @Test
+    fun parseStatus_ignoresBrokenPoolMetricNumbers() {
+        val raw = "running=1;worker_endpoint_pool_hits=x;worker_endpoint_pool_misses=bad;cf_pool_hits=;cf_pool_refill_errors=nope"
+        val metrics = ProxyRuntimeMetrics.parseStatus(raw)!!
+        assertEquals(0, metrics.workerEndpointPoolHits)
+        assertEquals(0, metrics.workerEndpointPoolMisses)
+        assertEquals(0, metrics.cfPoolHits)
+        assertEquals(0, metrics.cfPoolErrors)
+    }
+
+    @Test
+    fun parseStatus_blankReturnsNull() {
+        assertEquals(null, ProxyRuntimeMetrics.parseStatus(""))
+        assertEquals(null, ProxyRuntimeMetrics.parseStatus(null))
+    }
+
+    @Test
+    fun routeLabelRes_knownRoutes() {
+        assertEquals(R.string.route_display_worker, RouteDisplayNames.routeLabelRes("cf_worker_ws"))
+        assertEquals(R.string.route_display_cf_proxy, RouteDisplayNames.routeLabelRes("cf_proxy_ws"))
+        assertEquals(R.string.route_display_direct_ws, RouteDisplayNames.routeLabelRes("direct_ws"))
+    }
+
+    @Test
+    fun transportLabelRes_knownTransports() {
+        assertEquals(R.string.route_display_transport_websocket, RouteDisplayNames.transportLabelRes("websocket"))
+        assertEquals(R.string.route_display_transport_tcp, RouteDisplayNames.transportLabelRes("tcp"))
+    }
+
+    @Test
+    fun modeLabelRes_includesMtProto() {
+        assertEquals(R.string.proxy_frontend_mtproto_title, RouteDisplayNames.modeLabelRes("mtproto"))
+    }
+
+    @Test
+    fun mtProtoStatus_trafficAndConnectTimeComeFromConfirmedNativeStatus() {
+        val native = MtProtoNativeStatus.parse(
+            "status=LISTENING_ROUTE_READY;selected_backend=direct_tcp;" +
+                "actual_backend=awg_warp;fallback_used=true;route_reason=connected;" +
+                "active=2;total=7;bytes_up=4096;bytes_down=16384;connect_ms=218;last_error=none",
+        )
+        assertEquals(4096L, native.bytesUp)
+        assertEquals(16384L, native.bytesDown)
+        assertEquals(218L, native.lastConnectMs)
+
+        val metrics = ProxyRuntimeMetrics.fromMtProtoStatus(native)
+        assertEquals("awg_warp", metrics.currentRouteKind)
+        assertEquals(4096L, metrics.bytesUp)
+        assertEquals(16384L, metrics.bytesDown)
+        assertEquals(218L, metrics.lastConnectTimeMs)
+        // Connection setup time is not an RTT/ping measurement.
+        assertEquals(0L, metrics.lastLatencyMs)
+    }
+
+    @Test
+    fun mtProtoStatus_missingMetricsRemainUnknownRatherThanFabricated() {
+        val native = MtProtoNativeStatus.parse(
+            "status=LISTENING_ROUTE_READY;actual_backend=none;bytes_up=bad;" +
+                "bytes_down=-99;connect_ms=-10",
+        )
+        val metrics = ProxyRuntimeMetrics.fromMtProtoStatus(native)
+        assertEquals(0L, metrics.bytesUp)
+        assertEquals(0L, metrics.bytesDown)
+        assertEquals(0L, metrics.lastConnectTimeMs)
+    }
+
+    @Test
+    fun speedSampler_runtimeMetricsPreserveDownloadAndUploadDirections() {
+        val sampler = SpeedSampler(windowMs = 1_000)
+        sampler.sample(ProxyRuntimeMetrics(bytesUp = 0L, bytesDown = 0L), nowMs = 0L)
+        val (downloadBps, uploadBps) = sampler.sample(
+            ProxyRuntimeMetrics(bytesUp = 2_048L, bytesDown = 8_192L),
+            nowMs = 1_000L,
+        )
+        assertEquals(8_192.0, downloadBps, 0.001)
+        assertEquals(2_048.0, uploadBps, 0.001)
+    }
+
+    @Test
+    fun speedSampler_computesDelta() {
+        val sampler = SpeedSampler(windowMs = 1000)
+        sampler.sample(0, 0, nowMs = 0)
+        val (down, up) = sampler.sample(bytesUp = 1000, bytesDown = 2000, nowMs = 1000)
+        assertTrue(down > 0)
+        assertTrue(up > 0)
+    }
+
+    @Test
+    fun speedSampler_resetClearsState() {
+        val sampler = SpeedSampler()
+        sampler.sample(100, 200, 1000)
+        sampler.reset()
+        val (down, up) = sampler.sample(100, 200, 2000)
+        assertEquals(0.0, down, 0.001)
+        assertEquals(0.0, up, 0.001)
+    }
+}

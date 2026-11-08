@@ -1,0 +1,6 @@
+id=tg_ws_proxy
+name=TgBypass All-In-One (Vector + Service)
+version=v1.2.2
+versionCode=122
+author=windyx0 & bol-van
+description=Единый комплекс обхода блокировок Telegram: встроенный LSPosed/Vector модуль (com.windyx0.tgbypass) + автономный фоновый сервис WebSocket/Cloudflare прокси.
