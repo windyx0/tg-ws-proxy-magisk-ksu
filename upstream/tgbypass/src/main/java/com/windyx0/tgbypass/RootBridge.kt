@@ -103,7 +103,6 @@ object RootBridge {
         Pair("org.telegram.BifToGram", "BifToGram")
     )
 
-    // Official and ZaSto WSS Backends
     val AVAILABLE_BACKENDS = listOf(
         BackendOption("tgbypass", "TgBypass Daemon", "MTPROTO", "127.0.0.1", 1444, "Локальный WebSocket демон обхода"),
         BackendOption("zasto_wss_edge", "ZaSto WSS Cloudflare", "WSS_RELAY", "edge.amberwick.workers.dev", 443, "ZaSto Cloudflare Worker туннель"),
@@ -142,7 +141,6 @@ object RootBridge {
             }.toString()
             val escapedSync = syncJson.replace("\"", "\\\"")
 
-            // Sync to all installed clients that have files/plugins directory
             for ((pkg, _) in ALL_TELEGRAM_PACKAGES) {
                 val hasDir = execRoot("test -d /data/data/$pkg/files/plugins && echo 1 || test -d /data/user/0/$pkg/files/plugins && echo 1").contains("1")
                 if (hasDir) {
@@ -166,7 +164,6 @@ object RootBridge {
                 }
             }
 
-            // Update global marker in /data/local/tmp
             execRoot("echo \"$backendKey\" > /data/local/tmp/tgbypass_active_backend.txt && chmod 644 /data/local/tmp/tgbypass_active_backend.txt")
             true
         } catch (e: Exception) {
@@ -194,9 +191,14 @@ object RootBridge {
             } catch (_: Exception) {
                 Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
             }
-            val stdout = p.inputStream.bufferedReader().readText()
+            val reader = BufferedReader(InputStreamReader(p.inputStream, Charsets.UTF_8))
+            val sb = java.lang.StringBuilder()
+            var line: String?
+            while (reader.readLine().also { line = it } != null) {
+                sb.append(line).append("\n")
+            }
             p.waitFor()
-            stdout.trim()
+            sb.toString().trim()
         } catch (e: Exception) {
             Log.e(TAG, "execRoot failed: $cmd", e)
             ""
@@ -228,10 +230,14 @@ object RootBridge {
     suspend fun getVectorStatus(): Pair<Boolean, String> = withContext(Dispatchers.IO) {
         val out = execRoot("/data/adb/lspd/cli status 2>/dev/null")
         val isRunning = out.contains("Framework Version:")
-        val ver = if (isRunning) {
-            out.lines().firstOrNull { it.contains("Framework Version:") }?.substringAfter(":")?.trim() ?: "2.2"
-        } else {
-            "Не активен"
+        var ver = "2.2"
+        if (isRunning) {
+            val lines = out.split("\n")
+            for (line in lines) {
+                if (line.contains("Framework Version:")) {
+                    ver = line.substringAfter("Framework Version:").trim()
+                }
+            }
         }
         Pair(isRunning, ver)
     }
@@ -290,7 +296,7 @@ object RootBridge {
             val installed = try {
                 pm.getPackageInfo(pkg, 0) != null
             } catch (_: Exception) {
-                execRoot("pm path $pkg 2>/dev/null").isNotEmpty()
+                false
             }
             if (!installed) continue
 
@@ -298,7 +304,6 @@ object RootBridge {
             val pluginStatus = inspectClientPluginState(pkg)
 
             if (pluginStatus.supported && pluginStatus.enabled && !pluginStatus.safeMode) {
-                // Client with active plugin mode
                 val isOk = pluginStatus.bridgePluginInstalled && pluginStatus.bridgePluginEnabled
                 val detail = when {
                     isOk -> "Мост-плагин активен (127.0.0.1:1444)"
@@ -314,13 +319,12 @@ object RootBridge {
                     detail = detail
                 ))
             } else {
-                // Client without plugins OR plugins turned off / Safe Mode active -> Vector Hook fallback
                 val detail = when {
                     pluginStatus.supported && pluginStatus.safeMode -> {
                         if (inScope) "Безопасный режим -> Vector Hook активен" else "Безопасный режим -> Не в области Vector"
                     }
                     pluginStatus.supported && !pluginStatus.enabled -> {
-                        if (inScope) "Плагины выкл -> Vector Hook активен" else "Плагины выкл -> Не в области Vector"
+                        if (inScope) "Плагины выключены -> Vector Hook активен" else "Плагины выключены -> Не в области Vector"
                     }
                     pkg == "org.zastogram.messenger.dev" -> "Встроенный WSS-транспорт активен"
                     inScope -> "Vector Hook активен"
@@ -342,6 +346,8 @@ object RootBridge {
 
     suspend fun autoInstallAndFixAll(context: Context): String = withContext(Dispatchers.IO) {
         val sb = StringBuilder()
+        val pm = context.packageManager
+
         val pluginBytes = try {
             context.assets.open("tg_ws_vector_bridge.py").use { it.readBytes() }
         } catch (_: Exception) { null }
@@ -357,7 +363,11 @@ object RootBridge {
 
         // 2. Scan each installed client and automatically configure plugins vs Vector hook
         for ((pkg, name) in ALL_TELEGRAM_PACKAGES) {
-            val installed = execRoot("pm path $pkg 2>/dev/null").isNotEmpty()
+            val installed = try {
+                pm.getPackageInfo(pkg, 0) != null
+            } catch (_: Exception) {
+                false
+            }
             if (!installed) continue
 
             val pluginStatus = inspectClientPluginState(pkg)
@@ -392,11 +402,11 @@ object RootBridge {
                 if (pluginStatus.enabled && !pluginStatus.safeMode) {
                     // Remove from Vector scope to prevent ART crash
                     execRoot("/data/adb/lspd/cli scope rm com.windyx0.tgbypass $pkg/0 2>/dev/null")
-                    sb.append("$name: мост-плагин активен (Vector Hook исключен во избежание краша).\n")
+                    sb.append("$name: мост-плагин активен (Vector Hook исключен во избежание конфликта).\n")
                 } else {
                     // Safe mode is ON or plugins are disabled -> fallback to Vector Hook!
                     execRoot("/data/adb/lspd/cli scope add com.windyx0.tgbypass $pkg/0 2>/dev/null")
-                    sb.append("$name: плагины не активны -> подключен Vector Hook.\n")
+                    sb.append("$name: плагины отключены, подключен Vector Hook.\n")
                 }
             } else {
                 // Client has no plugin engine -> Vector Hook
@@ -406,16 +416,21 @@ object RootBridge {
         }
 
         // 3. Ensure proxy daemon is alive
-        if (!isPortListening()) {
-            execRoot("sh /data/adb/modules/tg_ws_proxy/service.sh 2>&1 &")
-            delay(1500)
+        com.windyx0.tgbypass.proxy.ProxyService.start(context, DEFAULT_PORT)
+        execRoot("am start-foreground-service -n com.windyx0.tgbypass/com.windyx0.tgbypass.proxy.ProxyService -a com.windyx0.tgbypass.START --ei EXTRA_PORT 1444 --es EXTRA_SECRET 7ee8902211954d7e8235f108a6313d42 >/dev/null 2>&1")
+
+        var isUp = false
+        for (i in 0 until 10) {
             if (isPortListening()) {
-                sb.append("Демон 127.0.0.1:1444 запущен.")
-            } else {
-                sb.append("Демон 127.0.0.1:1444 запускается...")
+                isUp = true
+                break
             }
+            delay(250)
+        }
+        if (isUp) {
+            sb.append("Демон 127.0.0.1:1444 запущен.")
         } else {
-            sb.append("Демон прокси активен (127.0.0.1:1444).")
+            sb.append("Демон 127.0.0.1:1444 запускается...")
         }
 
         sb.toString().trim()
@@ -423,17 +438,19 @@ object RootBridge {
 
     suspend fun getZapret2Status(): Triple<Boolean, String, String> = withContext(Dispatchers.IO) {
         val pid = execRoot("pgrep -f nfqws2 2>/dev/null | head -n 1").trim()
-        val isRunning = pid.isNotEmpty() && pid.all { it.isDigit() }
-        val msg = if (isRunning) "nfqws2 активен (PID: $pid, Очередь 200)" else "Служба остановлена"
-        Triple(isRunning, pid, msg)
+        val isRunning = pid.isNotEmpty()
+        val out = if (isRunning) "Активен (PID $pid)" else "Остановлен"
+        val mode = if (isRunning) "NFQWS2 Multi-Strategy" else "Выключен"
+        Triple(isRunning, out, mode)
     }
 
     suspend fun restartZapret2(): Boolean = withContext(Dispatchers.IO) {
-        execRoot("sh /data/adb/modules/zapret2/zapret2/scripts/zapret-restart.sh 2>&1 || sh /data/adb/modules/zapret2/zapret2/scripts/zapret-start.sh 2>&1")
+        execRoot("/data/adb/modules/zapret2/service.sh 2>&1 &")
+        delay(1000)
         getZapret2Status().first
     }
 
-    suspend fun pingEndpoint(host: String, port: Int = 443, timeoutMs: Int = 1800): Long? = withContext(Dispatchers.IO) {
+    suspend fun pingEndpoint(host: String, port: Int = 443, timeoutMs: Int = 800): Long? = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis()
         try {
             Socket().use { s ->
@@ -445,65 +462,32 @@ object RootBridge {
         }
     }
 
-    suspend fun testCloudflareEndpoints(): List<LatencyInfo> = withContext(Dispatchers.IO) {
-        val endpoints = listOf(
-            LatencyInfo(0, "TgBypass Локальный (Port 1444)", "127.0.0.1", DEFAULT_PORT, null),
-            LatencyInfo(1, "ZaSto WSS Edge (amberwick)", "edge.amberwick.workers.dev", 443, null),
-            LatencyInfo(2, "ZaSto WSS Резерв (brackencombe)", "nodeone.brackencombe.workers.dev", 443, null),
-            LatencyInfo(3, "Cloudflare Edge DC2 (Амстердам)", "kws2.pclead.co.uk", 443, null),
-            LatencyInfo(4, "Cloudflare Edge DC4 (Медиа/Видео)", "kws4.pclead.co.uk", 443, null),
-            LatencyInfo(5, "Cloudflare Anycast DNS (1.1.1.1)", "1.1.1.1", 443, null)
+    suspend fun testCloudflareEndpoints(): List<LatencyInfo> = coroutineScope {
+        val list = listOf(
+            LatencyInfo(1, "Cloudflare Front DC1 (Майами)", "kws1.pclead.co.uk", 443, null),
+            LatencyInfo(2, "Cloudflare Front DC2 (Амстердам)", "kws2.pclead.co.uk", 443, null),
+            LatencyInfo(4, "Cloudflare Front DC4 (Амстердам)", "kws4.pclead.co.uk", 443, null),
+            LatencyInfo(5, "Cloudflare Front DC5 (Сингапур)", "kws5.pclead.co.uk", 443, null),
+            LatencyInfo(203, "Cloudflare Front DC203 (Тест)", "kws203.pclead.co.uk", 443, null),
+            LatencyInfo(0, "ZaSto WSS Edge (Worker Primary)", "edge.amberwick.workers.dev", 443, null),
+            LatencyInfo(0, "ZaSto WSS Node (Worker Backup)", "nodeone.brackencombe.workers.dev", 443, null)
         )
-        coroutineScope {
-            endpoints.map { item ->
-                async {
-                    val lat = pingEndpoint(item.host, item.port)
-                    item.copy(latencyMs = lat)
-                }
-            }.awaitAll()
-        }
-    }
 
-    fun openTelegram(context: Context): Boolean {
-        return try {
-            val pm = context.packageManager
-            val known = listOf(
-                "com.radolyn.ayugram",
-                "app.exteragram.messenger",
-                "com.exteragram.messenger",
-                "org.zastogram.messenger.dev",
-                "org.telegram.messenger",
-                "org.thunderdog.challegram",
-                "tw.nekomimi.nekogram",
-                "cc.modery.cherrygram",
-                "org.telegram.plus"
-            )
-            val launchIntents = mutableListOf<Intent>()
-            for (pkg in known) {
-                val intent = pm.getLaunchIntentForPackage(pkg)
-                if (intent != null) {
-                    launchIntents.add(intent)
-                }
+        list.map { item ->
+            async {
+                val lat = pingEndpoint(item.host, item.port)
+                item.copy(latencyMs = lat)
             }
-            if (launchIntents.isEmpty()) {
-                val fallback = Intent(Intent.ACTION_VIEW, Uri.parse("tg://openmessage")).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(fallback)
-                return true
+        }.awaitAll()
+    }
+    fun openTelegram(context: Context) {
+        for ((pkg, _) in ALL_TELEGRAM_PACKAGES) {
+            val intent = context.packageManager.getLaunchIntentForPackage(pkg)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                return
             }
-            val base = launchIntents.removeAt(0).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-            val chooser = Intent.createChooser(base, "Выберите клиент Telegram").apply {
-                if (launchIntents.isNotEmpty()) {
-                    putExtra(Intent.EXTRA_INITIAL_INTENTS, launchIntents.toTypedArray())
-                }
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(chooser)
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "openTelegram error", e)
-            false
         }
     }
 }

@@ -213,16 +213,16 @@ fun TgBypassDashboard() {
                         val code = json.optInt("versionCode", 122)
                         val ver = json.optString("version", "v1.2.2")
                         withContext(Dispatchers.Main) {
-                            remoteVersionInfo = if (code > 122) "Доступно обновление: $ver" else "Установлена актуальная версия ($ver)"
+                            remoteVersionInfo = if (code > 122) "Доступно обновление: $ver" else "У вас актуальная версия ($ver)"
                         }
                     } else {
                         withContext(Dispatchers.Main) {
-                            remoteVersionInfo = "Установлена актуальная версия (v1.2.2)"
+                            remoteVersionInfo = "Актуальная версия (v1.2.2)"
                         }
                     }
                 } catch (_: Exception) {
                     withContext(Dispatchers.Main) {
-                        remoteVersionInfo = "Установлена актуальная версия (v1.2.2)"
+                        remoteVersionInfo = "Актуальная версия (v1.2.2)"
                     }
                 } finally {
                     withContext(Dispatchers.Main) {
@@ -502,6 +502,8 @@ fun TgBypassDashboard() {
             // 1. HERO STATUS CARD
             val isChecking = isPortListening == null || isVectorRunning == null || isModuleEnabledInVector == null || hasRoot == null
             val allGood = (isPortListening == true) && (isVectorRunning == true) && (isModuleEnabledInVector == true)
+            val clientsConfigured = telegramClients.isEmpty() || telegramClients.all { !it.isInstalled || it.isConfigured }
+            val allConfiguredAndActive = allGood && clientsConfigured
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(28.dp),
@@ -589,8 +591,8 @@ fun TgBypassDashboard() {
                     Text(
                         text = when {
                             isChecking -> "Проверка компонентов..."
-                            allGood -> "Обход Telegram активен • v1.2.2"
-                            else -> "TgBypass All-In-One • v1.2.2"
+                            allGood -> "Обход Telegram активен - v1.2.2"
+                            else -> "TgBypass All-In-One - v1.2.2"
                         },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
@@ -602,7 +604,7 @@ fun TgBypassDashboard() {
                     Text(
                         text = when {
                             isChecking -> "Определяем доступность локального шлюза 1444 и Vector LSPosed"
-                            allGood -> "Локальный демон 127.0.0.1:1444 • Vector хуки • AyuGram мост"
+                            allGood -> "Локальный демон 127.0.0.1:1444 - Vector хуки - AyuGram мост"
                             else -> when {
                                 hasRoot == false -> "Root права недоступны"
                                 isPortListening == false -> "Служба прокси 127.0.0.1:1444 не запущена"
@@ -615,42 +617,44 @@ fun TgBypassDashboard() {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    if (!allConfiguredAndActive) {
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                    // Fixed minHeight so text never clips!
-                    Button(
-                        onClick = {
-                            isFixingClients = true
-                            scope.launch {
-                                val res = RootBridge.autoInstallAndFixAll(context)
-                                syncState()
-                                isFixingClients = false
-                                showInline(res)
-                            }
-                        },
-                        enabled = !isFixingClients,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .defaultMinSize(minHeight = 52.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        if (isFixingClients) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("Применение настроек...")
-                        } else {
-                            Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Автонастройка и починка всех клиентов",
-                                style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
-                                fontWeight = FontWeight.Bold
+                        // Fixed minHeight so text never clips!
+                        Button(
+                            onClick = {
+                                isFixingClients = true
+                                scope.launch {
+                                    val res = RootBridge.autoInstallAndFixAll(context)
+                                    syncState()
+                                    isFixingClients = false
+                                    showInline(res)
+                                }
+                            },
+                            enabled = !isFixingClients,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 52.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
                             )
+                        ) {
+                            if (isFixingClients) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text("Применение настроек...")
+                            } else {
+                                Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Автонастройка и починка всех клиентов",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -730,7 +734,7 @@ fun TgBypassDashboard() {
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                                 Text(
-                                    text = "${backend.host}:${backend.port} • ${backend.description}",
+                                    text = "${backend.host}:${backend.port} - ${backend.description}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1081,7 +1085,7 @@ fun TgBypassDashboard() {
                             Text(
                                 text = when (z2Running) {
                                     null -> "Проверка службы nfqws2..."
-                                    true -> if (!z2?.second.isNullOrEmpty()) "PID: ${z2?.second} • NFQUEUE 200" else "nfqws2 активен • NFQUEUE 200"
+                                    true -> if (!z2?.second.isNullOrEmpty()) "PID: ${z2?.second} - NFQUEUE 200" else "nfqws2 активен - NFQUEUE 200"
                                     false -> "Служба остановлена"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
@@ -1180,12 +1184,12 @@ fun TgBypassDashboard() {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(text = "Текущая версия: v1.2.2 (All-In-One Unified)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                    
+
                     if (isCheckingUpdates) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = "Проверка на GitHub...", style = MaterialTheme.typography.bodySmall)
+                            Text(text = "Проверка обновлений на GitHub...", style = MaterialTheme.typography.bodySmall)
                         }
                     } else {
                         Surface(
@@ -1194,7 +1198,7 @@ fun TgBypassDashboard() {
                             modifier = Modifier.padding(vertical = 4.dp)
                         ) {
                             Text(
-                                text = remoteVersionInfo ?: "Установлена актуальная версия",
+                                text = remoteVersionInfo ?: "У вас актуальная версия",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF75F9BD),
@@ -1204,7 +1208,7 @@ fun TgBypassDashboard() {
                     }
 
                     Text(
-                        text = "• Демон tg-ws-proxy: v1.2.2\n• Vector Hook Модуль: v2.2\n• AyuGram Bridge: v1.2.2\n• Magisk / KernelSU модуль: активен\n• Репозиторий: windyx0/tg-ws-proxy-magisk-ksu",
+                        text = "- Встроенный демон tg-ws-proxy: v1.2.2\n- Встроенный Vector Hook модуль: v2.2\n- Встроенный AyuGram Bridge плагин: v2.2",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1215,7 +1219,7 @@ fun TgBypassDashboard() {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/windyx0/tg-ws-proxy-magisk-ksu/releases"))
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     context.startActivity(intent)
-                }) { Text("GitHub Релизы") }
+                }) { Text("GitHub") }
             },
             dismissButton = {
                 TextButton(onClick = { showUpdatesDialog = false }) { Text("Закрыть") }
@@ -1244,14 +1248,9 @@ fun TgBypassDashboard() {
                     Text(text = "TgBypass All-In-One Unified", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text(text = "Версия: 1.2.2\nРазработчик: @windyx0", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        text = "Включает в себя:\n• Менеджер и GUI с Material Design 3\n• Модуль Vector (LSPosed)\n• Мост-плагин для AyuGram (с автосинхронизацией)\n• Защищенные WebSocket туннели\n• Интеграцию с KernelSU / Magisk",
+                        text = "Включает в себя:\n- Менеджер и GUI с Material Design 3\n- Модуль Vector (LSPosed)\n- Мост-плагин для AyuGram (с автосинхронизацией)\n- ZaSto WSS Cloudflare туннели\n- Интеграцию с Zapret2",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "GitHub: github.com/windyx0/tg-ws-proxy-magisk-ksu",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             },

@@ -88,7 +88,7 @@ start_proxy() {
     local runtime_tokens="$dc_entries,@connection_mode=cf_first,@cfproxy=1,@cfproxy_priority=1,@cfproxy_only=0,@route_order=cf_proxy_ws|direct_ws|tcp_fallback,@route_cf_proxy_ws=1,@route_direct_ws=1,@route_tcp_fallback=1,@preferred_route=cf_proxy_ws,@route_fallback=1,@cf_cached_domains=$cf_domains"
 
     # Start proxy service with Cloudflare Turbo configuration
-    am start-foreground-service -n "$SERVICE_NAME" -a "com.windyx0.tgbypass.START" --ei "EXTRA_PORT" "$PORT" --es "EXTRA_IPS" "$runtime_tokens" >/dev/null 2>&1 || \
+    am start-foreground-service -n "$SERVICE_NAME" -a "com.windyx0.tgbypass.START" --ei "EXTRA_PORT" "$PORT" --es "EXTRA_SECRET" "7ee8902211954d7e8235f108a6313d42" --es "EXTRA_IPS" "$runtime_tokens" >/dev/null 2>&1 || \
     am start-foreground-service -n "$SERVICE_NAME" -a "com.amurcanov.tgwsproxy.START" --ei "EXTRA_PORT" "$PORT" --es "EXTRA_IPS" "$runtime_tokens" >/dev/null 2>&1 || \
     am startservice -n "$SERVICE_NAME" -a "com.windyx0.tgbypass.START" --ei "EXTRA_PORT" "$PORT" --es "EXTRA_IPS" "$runtime_tokens" >/dev/null 2>&1
 

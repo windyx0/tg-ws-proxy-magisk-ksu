@@ -43,17 +43,33 @@ class ProxyService : Service() {
         const val EXTRA_POOL_SIZE = "EXTRA_POOL_SIZE"
 
         const val DEFAULT_PORT = 1444
-        const val DEFAULT_SECRET = "ee111111111111111111111111111111117777772e636c6f7564666c6172652e636f6d"
+        const val DEFAULT_SECRET = "7ee8902211954d7e8235f108a6313d42"
         const val DEFAULT_CF_DOMAINS = "pclead.co.uk|offshor.co.uk|cakeisalie.co.uk|noskomnadzor.co.uk|lovetrue.co.uk|sorokdva.co.uk|pyatdesyatdva.co.uk|kartoshka.co.uk|sorokodin.co.uk|pyatdesyatodin.co.uk|notelega.co.uk|ebally.co.uk|nebally.co.uk|havegreatday.co.uk|pomogite.co.uk|fixtelega.co.uk|sadnews.co.uk|onedaychamp.co.uk|stopblocking.co.uk|nothingthere.co.uk"
         const val DEFAULT_DC_IPS = "1:149.154.175.50,2:149.154.167.51,4:149.154.167.91,203:91.105.192.100,@connection_mode=cf_first,@cfproxy=1,@cfproxy_priority=1,@cfproxy_only=0,@route_order=cf_proxy_ws|direct_ws|tcp_fallback,@route_cf_proxy_ws=1,@route_direct_ws=1,@route_tcp_fallback=1,@preferred_route=cf_proxy_ws,@route_fallback=1"
 
         private val _isRunning = MutableStateFlow(false)
         val isRunning: StateFlow<Boolean> = _isRunning
 
+        fun extractRawSecret(raw: String?): String {
+            if (raw.isNullOrBlank()) return DEFAULT_SECRET
+            val clean = raw.trim().lowercase(java.util.Locale.US)
+            if (clean.length == 32 && clean.all { it in "0123456789abcdef" }) {
+                return clean
+            }
+            if ((clean.startsWith("dd") || clean.startsWith("ee")) && clean.length >= 34) {
+                val candidate = clean.substring(2, 34)
+                if (candidate.all { it in "0123456789abcdef" }) {
+                    return candidate
+                }
+            }
+            return DEFAULT_SECRET
+        }
+
         fun start(context: Context, port: Int = DEFAULT_PORT) {
             val intent = Intent(context, ProxyService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_PORT, port)
+                putExtra(EXTRA_SECRET, DEFAULT_SECRET)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -82,7 +98,7 @@ class ProxyService : Service() {
         when (action) {
             ACTION_START, LEGACY_ACTION_START -> {
                 val port = intent?.getIntExtra(EXTRA_PORT, DEFAULT_PORT) ?: DEFAULT_PORT
-                val secret = intent?.getStringExtra(EXTRA_SECRET) ?: DEFAULT_SECRET
+                val secret = extractRawSecret(intent?.getStringExtra(EXTRA_SECRET))
                 var ips = intent?.getStringExtra(EXTRA_IPS) ?: ""
                 if (ips.isBlank()) {
                     ips = "$DEFAULT_DC_IPS,@cf_cached_domains=$DEFAULT_CF_DOMAINS"
