@@ -12,40 +12,39 @@ TgBypass combines an autonomous background WebSocket tunnel daemon, a Vector (LS
 
 The system consists of four interconnected components:
 
-```
-+-------------------------------------------------------------------------+
-|                                User Interface                           |
-|                  TgBypass Dashboard (com.windyx0.tgbypass)              |
-|        Material 3 UI, health monitoring, backend selector, ping         |
-+-------------------------------------------------------------------------+
-        |                                                 |
-        v                                                 v
-+-------------------------------+       +---------------------------------+
-|     Vector (LSPosed) Module   |       |     AyuGram Bridge Plugin       |
-| Socket-level traffic hooks    |       |   (tg_ws_vector_bridge.py)      |
-| Supported: Telegram, extera,  |       | Real-time bidirectional sync    |
-| Telegram X, Plus, Nekogram    |       | Full proxying including VoIP    |
-+-------------------------------+       +---------------------------------+
-        |                                                 |
-        +-----------------------+-------------------------+
-                                |
-                                v
-+-------------------------------------------------------------------------+
-|                Background Proxy Service (127.0.0.1:1444)                |
-|             Autonomous system daemon with boot persistence              |
-+-------------------------------------------------------------------------+
-                                |
-                                v
-+-------------------------------------------------------------------------+
-|                  Linux Kernel Network Turbo (Root)                      |
-|       TCP BBR + FQ pacing, TCP Fast Open, 16MB buffers, DSCP AF41       |
-+-------------------------------------------------------------------------+
-                                |
-                                v
-+-------------------------------------------------------------------------+
-|                            Upstream Backends                            |
-|       ZaSto WSS Edge, Cloudflare Front DC2, ZaSto Reserve Node          |
-+-------------------------------------------------------------------------+
+```mermaid
+flowchart TD
+    subgraph UI ["User Interface"]
+        APP["TgBypass Dashboard<br/>com.windyx0.tgbypass<br/>Material 3 Manager"]
+    end
+
+    subgraph HOOKS ["Traffic Routing Layer"]
+        VEC["Vector (LSPosed) Hook<br/>Telegram, extera, TG X, Plus, Neko"]
+        AYU["AyuGram Bridge Plugin<br/>tg_ws_vector_bridge.py<br/>Full Traffic &amp; VoIP Calls"]
+    end
+
+    subgraph DAEMON ["Autonomous Local Service"]
+        SVC["TgBypass Daemon<br/>127.0.0.1:1444"]
+    end
+
+    subgraph KERNEL ["Kernel Network Turbo"]
+        NET["Root Kernel Acceleration<br/>TCP BBR + FQ Pacing<br/>TCP Fast Open &amp; 16MB Buffers"]
+    end
+
+    subgraph BACKENDS ["Upstream Endpoints"]
+        EDGE["ZaSto WSS Edge<br/>edge.amberwick.workers.dev"]
+        DC2["Cloudflare Front DC2<br/>kws2.pclead.co.uk"]
+        NODE["ZaSto Reserve Node<br/>nodeone.brackencombe.workers.dev"]
+    end
+
+    APP -->|Status &amp; Control| VEC
+    APP -->|Sync Intent| AYU
+    VEC -->|Direct Redirect| SVC
+    AYU -->|Local Bridge| SVC
+    SVC -->|High-Speed TCP| NET
+    NET -->|WSS Tunnel| EDGE
+    NET -->|Direct TLS| DC2
+    NET -->|WSS Fallback| NODE
 ```
 
 ---
