@@ -16,6 +16,8 @@ build/
 **/build/**
 upstream/*/build/
 upstream/**/build/
+upstream/xposed-stub/build/
+upstream/tgbypass/build/
 *.apk
 *.aab
 local.properties
