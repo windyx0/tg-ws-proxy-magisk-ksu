@@ -121,7 +121,7 @@ fun TgBypassDashboard() {
         mutableStateOf<Boolean?>(if (prefs.contains("last_zapret2_running")) prefs.getBoolean("last_zapret2_running", true) else null)
     }
     var zapret2Status by remember { mutableStateOf<Triple<Boolean, String, String>?>(null) }
-    var telegramClients by remember { mutableStateOf<List<TelegramClientInfo>>(emptyList()) }
+    var telegramClients by remember { mutableStateOf<List<TelegramClientInfo>?>(null) }
     var isFixingClients by remember { mutableStateOf(false) }
 
     var selectedBackend by remember { mutableStateOf(prefs.getString("active_backend", "tgbypass") ?: "tgbypass") }
@@ -502,7 +502,7 @@ fun TgBypassDashboard() {
             // 1. HERO STATUS CARD
             val isChecking = isPortListening == null || isVectorRunning == null || isModuleEnabledInVector == null || hasRoot == null
             val allGood = (isPortListening == true) && (isVectorRunning == true) && (isModuleEnabledInVector == true)
-            val clientsConfigured = telegramClients.isEmpty() || telegramClients.all { !it.isInstalled || it.isConfigured }
+            val clientsConfigured = (telegramClients != null) && (telegramClients!!.isEmpty() || telegramClients!!.all { !it.isInstalled || it.isConfigured })
             val allConfiguredAndActive = allGood && clientsConfigured
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -873,14 +873,20 @@ fun TgBypassDashboard() {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    if (telegramClients.isEmpty()) {
+                    if (telegramClients == null) {
                         Text(
                             text = "Поиск установленных клиентов...",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    } else if (telegramClients!!.isEmpty()) {
+                        Text(
+                            text = "Установленные клиенты Telegram не найдены",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     } else {
-                        telegramClients.forEachIndexed { idx, client ->
+                        telegramClients!!.forEachIndexed { idx, client ->
                             if (idx > 0) {
                                 Spacer(modifier = Modifier.height(10.dp))
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -939,8 +945,10 @@ fun TgBypassDashboard() {
 
                     OutlinedButton(
                         onClick = {
-                            RootBridge.openTelegram(context)
-                            showInline("Выбор клиента Telegram")
+                            scope.launch {
+                                RootBridge.openTelegram(context)
+                            }
+                            showInline("Запуск клиента Telegram")
                         },
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                         shape = RoundedCornerShape(14.dp)

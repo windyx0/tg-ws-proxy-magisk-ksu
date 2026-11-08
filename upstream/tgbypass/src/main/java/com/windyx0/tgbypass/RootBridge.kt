@@ -290,14 +290,13 @@ object RootBridge {
     suspend fun getInstalledTelegramClients(context: Context): List<TelegramClientInfo> = withContext(Dispatchers.IO) {
         val list = mutableListOf<TelegramClientInfo>()
         val pm = context.packageManager
+        val fromPm = try { pm.getInstalledPackages(0).map { it.packageName }.toSet() } catch (_: Exception) { null } ?: emptySet()
+        val fromShell = execRoot("pm list packages 2>/dev/null").split("\n").map { it.removePrefix("package:").trim() }.filter { it.isNotEmpty() }.toSet()
+        val installedSet = fromPm + fromShell
         val vectorScope = execRoot("/data/adb/lspd/cli scope ls com.windyx0.tgbypass 2>/dev/null")
 
         for ((pkg, name) in ALL_TELEGRAM_PACKAGES) {
-            val installed = try {
-                pm.getPackageInfo(pkg, 0) != null
-            } catch (_: Exception) {
-                false
-            }
+            val installed = installedSet.contains(pkg) || runCatching { pm.getPackageInfo(pkg, 0) != null }.getOrDefault(false)
             if (!installed) continue
 
             val inScope = vectorScope.contains(pkg)
@@ -361,13 +360,13 @@ object RootBridge {
         // 1. Ensure Vector module is enabled in LSPosed/Vector
         execRoot("/data/adb/lspd/cli modules enable com.windyx0.tgbypass 2>/dev/null")
 
+        val fromPm = try { pm.getInstalledPackages(0).map { it.packageName }.toSet() } catch (_: Exception) { null } ?: emptySet()
+        val fromShell = execRoot("pm list packages 2>/dev/null").split("\n").map { it.removePrefix("package:").trim() }.filter { it.isNotEmpty() }.toSet()
+        val installedSet = fromPm + fromShell
+
         // 2. Scan each installed client and automatically configure plugins vs Vector hook
         for ((pkg, name) in ALL_TELEGRAM_PACKAGES) {
-            val installed = try {
-                pm.getPackageInfo(pkg, 0) != null
-            } catch (_: Exception) {
-                false
-            }
+            val installed = installedSet.contains(pkg) || runCatching { pm.getPackageInfo(pkg, 0) != null }.getOrDefault(false)
             if (!installed) continue
 
             val pluginStatus = inspectClientPluginState(pkg)
@@ -480,13 +479,23 @@ object RootBridge {
             }
         }.awaitAll()
     }
-    fun openTelegram(context: Context) {
+    suspend fun openTelegram(context: Context) = withContext(Dispatchers.IO) {
+        val pm = context.packageManager
         for ((pkg, _) in ALL_TELEGRAM_PACKAGES) {
-            val intent = context.packageManager.getLaunchIntentForPackage(pkg)
+            val intent = pm.getLaunchIntentForPackage(pkg)
             if (intent != null) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-                return
+                try {
+                    context.startActivity(intent)
+                    return@withContext
+                } catch (_: Exception) {}
+            }
+        }
+        for ((pkg, _) in ALL_TELEGRAM_PACKAGES) {
+            val path = execRoot("pm path $pkg 2>/dev/null")
+            if (path.isNotEmpty()) {
+                execRoot("monkey -p $pkg -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 &")
+                return@withContext
             }
         }
     }
