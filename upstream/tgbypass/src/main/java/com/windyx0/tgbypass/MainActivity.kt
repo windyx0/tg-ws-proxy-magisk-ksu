@@ -46,6 +46,9 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try {
+            com.windyx0.tgbypass.proxy.ProxyService.start(this)
+        } catch (_: Exception) {}
         setContent {
             TgBypassMaterialTheme {
                 TgBypassDashboard()
@@ -122,6 +125,7 @@ fun TgBypassDashboard() {
     }
     var zapret2Status by remember { mutableStateOf<Triple<Boolean, String, String>?>(null) }
     var telegramClients by remember { mutableStateOf<List<TelegramClientInfo>?>(null) }
+    var lastClientsConfigured by remember { mutableStateOf(prefs.getBoolean("last_clients_configured", true)) }
     var isFixingClients by remember { mutableStateOf(false) }
 
     var selectedBackend by remember { mutableStateOf(prefs.getString("active_backend", "tgbypass") ?: "tgbypass") }
@@ -292,11 +296,14 @@ fun TgBypassDashboard() {
                     isZapret2Running = z2.first
                     zapret2Status = z2
                     telegramClients = clients
+                    val clientsConfigured = clients.isEmpty() || clients.all { !it.isInstalled || it.isConfigured }
+                    lastClientsConfigured = clientsConfigured
                     prefs.edit()
                         .putBoolean("last_vector_running", vStat.first)
                         .putString("last_vector_version", vStat.second)
                         .putBoolean("last_module_enabled", modEnabled)
                         .putBoolean("last_zapret2_running", z2.first)
+                        .putBoolean("last_clients_configured", clientsConfigured)
                         .apply()
                 }
             } else {
@@ -505,10 +512,14 @@ fun TgBypassDashboard() {
             }
 
             // 1. HERO STATUS CARD
-            val isChecking = isPortListening == null || isVectorRunning == null || isModuleEnabledInVector == null || hasRoot == null
+            val isChecking = isPortListening == null || isVectorRunning == null || isModuleEnabledInVector == null || hasRoot == null || telegramClients == null
             val allGood = (isPortListening == true) && (isVectorRunning == true) && (isModuleEnabledInVector == true)
-            val clientsConfigured = (telegramClients != null) && (telegramClients!!.isEmpty() || telegramClients!!.all { !it.isInstalled || it.isConfigured })
-            val allConfiguredAndActive = allGood && clientsConfigured
+            val hasUnconfiguredClients = if (telegramClients != null) {
+                telegramClients!!.any { it.isInstalled && !it.isConfigured }
+            } else {
+                !lastClientsConfigured
+            }
+            val needsSetup = !isChecking && (!allGood || hasUnconfiguredClients)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(28.dp),
@@ -622,43 +633,49 @@ fun TgBypassDashboard() {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    if (!allConfiguredAndActive) {
-                        Spacer(modifier = Modifier.height(20.dp))
+                    AnimatedVisibility(
+                        visible = needsSetup || isFixingClients,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        Column {
+                            Spacer(modifier = Modifier.height(20.dp))
 
-                        // Fixed minHeight so text never clips!
-                        Button(
-                            onClick = {
-                                isFixingClients = true
-                                scope.launch {
-                                    val res = RootBridge.autoInstallAndFixAll(context)
-                                    syncState()
-                                    isFixingClients = false
-                                    showInline(res)
-                                }
-                            },
-                            enabled = !isFixingClients,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .defaultMinSize(minHeight = 52.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            )
-                        ) {
-                            if (isFixingClients) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text("Применение настроек...")
-                            } else {
-                                Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "Автонастройка и починка всех клиентов",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
-                                    fontWeight = FontWeight.Bold
+                            // Fixed minHeight so text never clips!
+                            Button(
+                                onClick = {
+                                    isFixingClients = true
+                                    scope.launch {
+                                        val res = RootBridge.autoInstallAndFixAll(context)
+                                        syncState()
+                                        isFixingClients = false
+                                        showInline(res)
+                                    }
+                                },
+                                enabled = !isFixingClients,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .defaultMinSize(minHeight = 52.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                 )
+                            ) {
+                                if (isFixingClients) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text("Применение настроек...")
+                                } else {
+                                    Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = "Автонастройка и починка всех клиентов",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 14.sp),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
