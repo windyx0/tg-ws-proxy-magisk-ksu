@@ -11,18 +11,20 @@ mkdir -p "$CONF_DIR" 2>/dev/null
 PORT=1444
 [ -f "$CONF_DIR/port" ] && PORT=$(cat "$CONF_DIR/port" 2>/dev/null)
 
-PRIMARY_APP_ID="com.windyx0.twgsproxy"
-FALLBACK_APP_ID="io.github.regstar2.tgwsproxy"
+PRIMARY_APP_ID="com.windyx0.tgbypass"
+FALLBACK_APP_ID="com.windyx0.twgsproxy"
 
 # Detect which app is installed
 if pm path "$PRIMARY_APP_ID" >/dev/null 2>&1; then
     APP_ID="$PRIMARY_APP_ID"
+    SERVICE_NAME="$APP_ID/com.windyx0.tgbypass.proxy.ProxyService"
 elif pm path "$FALLBACK_APP_ID" >/dev/null 2>&1; then
     APP_ID="$FALLBACK_APP_ID"
+    SERVICE_NAME="$APP_ID/com.amurcanov.tgwsproxy.ProxyService"
 else
     APP_ID="$PRIMARY_APP_ID"
+    SERVICE_NAME="$APP_ID/com.windyx0.tgbypass.proxy.ProxyService"
 fi
-SERVICE_NAME="$APP_ID/com.amurcanov.tgwsproxy.ProxyService"
 
 # ------------------------------------------------------------------------------
 # Helper: check if port is currently listening
@@ -86,8 +88,9 @@ start_proxy() {
     local runtime_tokens="$dc_entries,@connection_mode=cf_first,@cfproxy=1,@cfproxy_priority=1,@cfproxy_only=0,@route_order=cf_proxy_ws|direct_ws|tcp_fallback,@route_cf_proxy_ws=1,@route_direct_ws=1,@route_tcp_fallback=1,@preferred_route=cf_proxy_ws,@route_fallback=1,@cf_cached_domains=$cf_domains"
 
     # Start proxy service with Cloudflare Turbo configuration
+    am start-foreground-service -n "$SERVICE_NAME" -a "com.windyx0.tgbypass.START" --ei "EXTRA_PORT" "$PORT" --es "EXTRA_IPS" "$runtime_tokens" >/dev/null 2>&1 || \
     am start-foreground-service -n "$SERVICE_NAME" -a "com.amurcanov.tgwsproxy.START" --ei "EXTRA_PORT" "$PORT" --es "EXTRA_IPS" "$runtime_tokens" >/dev/null 2>&1 || \
-    am startservice -n "$SERVICE_NAME" -a "com.amurcanov.tgwsproxy.START" --ei "EXTRA_PORT" "$PORT" --es "EXTRA_IPS" "$runtime_tokens" >/dev/null 2>&1
+    am startservice -n "$SERVICE_NAME" -a "com.windyx0.tgbypass.START" --ei "EXTRA_PORT" "$PORT" --es "EXTRA_IPS" "$runtime_tokens" >/dev/null 2>&1
 
     # Automatically suppress notification
     kill_notification
@@ -119,6 +122,7 @@ start_proxy() {
 # ------------------------------------------------------------------------------
 stop_proxy() {
     echo "[*] Stopping Telegram WS Proxy..."
+    am startservice -n "$SERVICE_NAME" -a "com.windyx0.tgbypass.STOP" >/dev/null 2>&1 || \
     am startservice -n "$SERVICE_NAME" -a "com.amurcanov.tgwsproxy.STOP" >/dev/null 2>&1
     
     if [ -f "$CONF_DIR/daemon.pid" ]; then

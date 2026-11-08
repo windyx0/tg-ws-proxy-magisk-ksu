@@ -15,27 +15,34 @@ UPSTREAM_DIR = os.path.join(ROOT_DIR, "upstream")
 MODULE_DIR = os.path.join(ROOT_DIR, "magisk-module")
 RELEASE_DIR = os.path.join(ROOT_DIR, "release")
 ASSETS_DIR = os.path.join(UPSTREAM_DIR, "tgbypass", "src", "main", "assets")
+APK_RELEASE_PATH = os.path.join(UPSTREAM_DIR, "tgbypass", "build", "outputs", "apk", "release", "tgbypass-release.apk")
 APK_DEBUG_PATH = os.path.join(UPSTREAM_DIR, "tgbypass", "build", "outputs", "apk", "debug", "tgbypass-debug.apk")
 
 VERSION = "1.2.2"
 
 def ensure_build():
-    if not os.path.exists(APK_DEBUG_PATH):
-        print("[*] APK not found, building with Gradle...")
-        gradlew = os.path.join(UPSTREAM_DIR, "gradlew.bat" if os.name == "nt" else "gradlew")
-        subprocess.check_call([gradlew, ":tgbypass:assembleDebug"], cwd=UPSTREAM_DIR)
+    if os.path.exists(APK_RELEASE_PATH):
+        print("[*] Found signed release APK:", APK_RELEASE_PATH)
+        return APK_RELEASE_PATH
+    elif os.path.exists(APK_DEBUG_PATH):
+        print("[*] Found debug APK:", APK_DEBUG_PATH)
+        return APK_DEBUG_PATH
     else:
-        print("[*] Found existing APK:", APK_DEBUG_PATH)
+        print("[*] Building release APK with Gradle...")
+        gradlew = os.path.join(UPSTREAM_DIR, "gradlew.bat" if os.name == "nt" else "gradlew")
+        subprocess.check_call([gradlew, ":tgbypass:assembleRelease"], cwd=UPSTREAM_DIR)
+        return APK_RELEASE_PATH
 
 def package():
     os.makedirs(RELEASE_DIR, exist_ok=True)
+    apk_source = ensure_build()
 
     # 1. Update module binary and python script
     mod_bin_apk = os.path.join(MODULE_DIR, "bin", "tgbypass_vector.apk")
     mod_script = os.path.join(MODULE_DIR, "scripts", "tg_ws_vector_bridge.py")
     src_script = os.path.join(ASSETS_DIR, "tg_ws_vector_bridge.py")
 
-    shutil.copyfile(APK_DEBUG_PATH, mod_bin_apk)
+    shutil.copyfile(apk_source, mod_bin_apk)
     shutil.copyfile(src_script, mod_script)
     print("[*] Updated module assets.")
 
@@ -57,7 +64,7 @@ def package():
     # 3. Copy standalone assets
     apk_release = os.path.join(RELEASE_DIR, f"TgBypass-v{VERSION}.apk")
     plugin_release = os.path.join(RELEASE_DIR, "tg_ws_vector_bridge.py")
-    shutil.copyfile(APK_DEBUG_PATH, apk_release)
+    shutil.copyfile(apk_source, apk_release)
     shutil.copyfile(src_script, plugin_release)
     print(f"[+] Standalone APK: {apk_release}")
     print(f"[+] Standalone Plugin: {plugin_release}")

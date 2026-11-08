@@ -47,6 +47,7 @@ release/*.zip
 *.xml
 *.keystore
 *.json
+!update.json
 !magisk-module/**
 !upstream/**
 

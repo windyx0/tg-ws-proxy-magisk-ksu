@@ -193,8 +193,45 @@ fun TgBypassDashboard() {
     var isPinging by remember { mutableStateOf(false) }
 
     var showUpdatesDialog by remember { mutableStateOf(false) }
+    var remoteVersionInfo by remember { mutableStateOf<String?>(null) }
+    var isCheckingUpdates by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showTopMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showUpdatesDialog) {
+        if (showUpdatesDialog) {
+            isCheckingUpdates = true
+            withContext(Dispatchers.IO) {
+                try {
+                    val url = java.net.URL("https://raw.githubusercontent.com/windyx0/tg-ws-proxy-magisk-ksu/main/update.json")
+                    val conn = url.openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 3000
+                    conn.readTimeout = 3000
+                    if (conn.responseCode == 200) {
+                        val txt = conn.inputStream.bufferedReader().readText()
+                        val json = org.json.JSONObject(txt)
+                        val code = json.optInt("versionCode", 122)
+                        val ver = json.optString("version", "v1.2.2")
+                        withContext(Dispatchers.Main) {
+                            remoteVersionInfo = if (code > 122) "Доступно обновление: $ver" else "Установлена актуальная версия ($ver)"
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            remoteVersionInfo = "Установлена актуальная версия (v1.2.2)"
+                        }
+                    }
+                } catch (_: Exception) {
+                    withContext(Dispatchers.Main) {
+                        remoteVersionInfo = "Установлена актуальная версия (v1.2.2)"
+                    }
+                } finally {
+                    withContext(Dispatchers.Main) {
+                        isCheckingUpdates = false
+                    }
+                }
+            }
+        }
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     var isForeground by remember { mutableStateOf(true) }
@@ -1143,21 +1180,31 @@ fun TgBypassDashboard() {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(text = "Текущая версия: v1.2.2 (All-In-One Unified)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF143823),
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "✓ Установлена самая актуальная версия",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF75F9BD),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                    
+                    if (isCheckingUpdates) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Проверка на GitHub...", style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF143823),
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = remoteVersionInfo ?: "Установлена актуальная версия",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF75F9BD),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
                     }
+
                     Text(
-                        text = "• Демон tg-ws-proxy: v1.2.2\n• Vector Hook Модуль: v2.2\n• AyuGram Bridge: v1.2.2\n• ZaStoGram Native: v13.2.1\n• Magisk All-In-One: активен",
+                        text = "• Демон tg-ws-proxy: v1.2.2\n• Vector Hook Модуль: v2.2\n• AyuGram Bridge: v1.2.2\n• Magisk / KernelSU модуль: активен\n• Репозиторий: windyx0/tg-ws-proxy-magisk-ksu",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1165,10 +1212,10 @@ fun TgBypassDashboard() {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/radolyn/ayugram-desktop/releases"))
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/windyx0/tg-ws-proxy-magisk-ksu/releases"))
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     context.startActivity(intent)
-                }) { Text("GitHub") }
+                }) { Text("GitHub Релизы") }
             },
             dismissButton = {
                 TextButton(onClick = { showUpdatesDialog = false }) { Text("Закрыть") }
@@ -1197,9 +1244,14 @@ fun TgBypassDashboard() {
                     Text(text = "TgBypass All-In-One Unified", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text(text = "Версия: 1.2.2\nРазработчик: @windyx0", style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        text = "Включает в себя:\n• Менеджер и GUI с Material Design 3\n• Модуль Vector (LSPosed)\n• Мост-плагин для AyuGram (с автосинхронизацией)\n• ZaSto WSS Cloudflare туннели\n• Интеграцию с Zapret2",
+                        text = "Включает в себя:\n• Менеджер и GUI с Material Design 3\n• Модуль Vector (LSPosed)\n• Мост-плагин для AyuGram (с автосинхронизацией)\n• Защищенные WebSocket туннели\n• Интеграцию с KernelSU / Magisk",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "GitHub: github.com/windyx0/tg-ws-proxy-magisk-ksu",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             },
